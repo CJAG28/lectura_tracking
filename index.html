@@ -415,6 +415,118 @@
     let bookIdToDelete = null;
 
     // =========================================================================
+    // INICIALIZACIÓN Y DATOS DE EJEMPLO
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      loadLocalData();
+      renderLibrary();
+      initGoogleScripts();
+    });
+
+    function loadLocalData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          books = JSON.parse(saved);
+        } else {
+          // Datos iniciales de demostración con sagas y obras independientes
+          books = [
+            {
+              id: 'demo-1',
+              title: 'El Imperio Final',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 688,
+              total: 688,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 1,
+              cover: ''
+            },
+            {
+              id: 'demo-2',
+              title: 'El Pozo de la Ascensión',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 310,
+              total: 800,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 2,
+              cover: ''
+            },
+            {
+              id: 'demo-3',
+              title: 'El Héroe de las Eras',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 0,
+              total: 760,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 3,
+              cover: ''
+            },
+            {
+              id: 'demo-4',
+              title: 'Chainsaw Man Vol. 1',
+              type: 'Manga',
+              author: 'Tatsuki Fujimoto',
+              current: 7,
+              total: 7,
+              isSaga: true,
+              sagaName: 'Chainsaw Man',
+              sagaOrder: 1,
+              cover: ''
+            },
+            {
+              id: 'demo-5',
+              title: 'Chainsaw Man Vol. 2',
+              type: 'Manga',
+              author: 'Tatsuki Fujimoto',
+              current: 4,
+              total: 9,
+              isSaga: true,
+              sagaName: 'Chainsaw Man',
+              sagaOrder: 2,
+              cover: ''
+            },
+            {
+              id: 'demo-6',
+              title: 'Proyecto Hail Mary',
+              type: 'Libro',
+              author: 'Andy Weir',
+              current: 195,
+              total: 528,
+              isSaga: false,
+              sagaName: '',
+              sagaOrder: 1,
+              cover: ''
+            }
+          ];
+          saveLocalData();
+        }
+
+        const savedExpanded = localStorage.getItem(EXPANDED_SAGAS_KEY);
+        if (savedExpanded) {
+          expandedSagas = new Set(JSON.parse(savedExpanded));
+        }
+      } catch (e) {
+        console.error('Error cargando localStorage:', e);
+        books = [];
+      }
+    }
+
+    function saveLocalData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+        localStorage.setItem(EXPANDED_SAGAS_KEY, JSON.stringify([...expandedSagas]));
+      } catch (e) {
+        console.error('Error guardando localStorage:', e);
+      }
+    }
+
+    // =========================================================================
     // GOOGLE IDENTITY SERVICES Y SHEETS SYNC
     // =========================================================================
     function initGoogleScripts() {
