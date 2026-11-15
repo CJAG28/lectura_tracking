@@ -2,39 +2,32 @@
 <html lang="es" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
   <title>BiblioTrack — Gestor de Lecturas y Sagas</title>
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Google Identity Services (OAuth 2.0) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Google Identity Services & Google API -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'sans-serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
           },
-          colors: {
-            slate: {
-              850: '#151e32',
-              900: '#0f172a',
-              950: '#090d16',
-            }
-          }
-        }
-      }
+        },
+      },
     };
   </script>
+
   <style>
-    /* Estilos personalizados complementarios */
     body {
       font-family: 'Inter', sans-serif;
       background-color: #090d16;
@@ -42,436 +35,307 @@
       overflow-x: hidden;
     }
 
-    /* Scrollbar elegante */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+    /* Ocultar barra de desplazamiento en filtros horizontales móviles */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
     }
-    ::-webkit-scrollbar-track {
-      background: #0f172a;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #475569;
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
 
-    /* Animaciones suaves */
-    @keyframes pulseGlow {
-      0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.35); }
-      50% { box-shadow: 0 0 32px rgba(168, 85, 247, 0.55); }
-    }
-    .btn-roulette {
-      animation: pulseGlow 3s infinite ease-in-out;
-    }
-
-    @keyframes popIn {
-      0% { opacity: 0; transform: scale(0.94) translateY(8px); }
-      100% { opacity: 1; transform: scale(1) translateY(0); }
-    }
-    .animate-pop-in {
-      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    /* Transición suave en barra de progreso */
+    /* Transiciones suaves para tarjetas y progreso */
     .progress-bar-fill {
-      transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.45s ease;
+      transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.45s ease;
+    }
+
+    .saga-chevron {
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .saga-chevron.rotated {
+      transform: rotate(180deg);
+    }
+
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-card {
+      animation: fadeSlideUp 0.25s ease-out forwards;
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
 
-  <!-- Toast / Notificación flotante (sin alert) -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <!-- Toast / Notificación flotante (sin alert()) -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- Barra de Navegación Superior -->
-  <header class="sticky top-0 z-30 bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
-      <!-- Logo y Título -->
-      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <i data-lucide="book-open-check" class="w-5 h-5 text-white"></i>
-          </div>
-          <div>
-            <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              BiblioTrack
-            </h1>
-            <p class="text-xs text-slate-400">Libros, Cómics, Mangas y Sagas</p>
-          </div>
-        </div>
-
-        <!-- Botón móvil rápido -->
-        <button onclick="openFormModal()" class="md:hidden inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition shadow-md">
-          <i data-lucide="plus" class="w-4 h-4"></i> Nuevo
-        </button>
-      </div>
-
-      <!-- Acciones principales -->
-      <div class="flex flex-wrap items-center justify-center md:justify-end gap-2.5 w-full md:w-auto">
-        <!-- Indicador de estado de sincronización -->
-        <div id="sync-status-badge" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-medium text-slate-400" title="Estado de almacenamiento">
-          <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
-          <span id="sync-status-text">Modo Local</span>
-        </div>
-
-        <!-- Botón Lectura del Día -->
-        <button onclick="openDailyPickModal()" class="btn-roulette inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 hover:from-indigo-500 hover:to-fuchsia-500 text-white text-sm font-bold transition transform active:scale-95 cursor-pointer">
-          <span class="text-base">🎲</span>
-          <span>Elegir Lectura del Día</span>
-        </button>
-
-        <!-- Botón Agregar Lectura (Desktop) -->
-        <button onclick="openFormModal()" class="hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-sm font-semibold transition cursor-pointer">
-          <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-400"></i>
-          <span>Registrar Título</span>
-        </button>
-
-        <!-- Panel de Autenticación y Google Sheets -->
-        <div id="auth-container" class="flex items-center gap-2">
-          <!-- Botón Conectar con Google Sheets (Visible cuando no hay sesión) -->
-          <div id="google-login-group" class="flex items-center gap-1.5">
-            <button id="google-login-btn" onclick="connectGoogleSheets()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-sm font-bold shadow-md transition cursor-pointer">
-              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#0F9D58" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 15H9v-2h6v2zm0-4H9v-2h6v2zm-2-4V3.5L18.5 9H13z"/>
+  <!-- Header Sticky Responsivo -->
+  <header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        
+        <!-- Fila superior en móvil: Logo + Botón Agregar -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
               </svg>
-              <span>Conectar con Google Sheets</span>
-            </button>
-            <button id="setup-help-btn" onclick="openSetupHelpModal()" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 transition cursor-pointer" title="¿Cómo configurar mi Client ID de Google?">
-              <i data-lucide="help-circle" class="w-4 h-4"></i>
-            </button>
+            </div>
+            <div class="min-w-0">
+              <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white truncate">BiblioTrack</h1>
+              <p class="text-[11px] sm:text-xs text-slate-400 truncate">Sagas, Libros, Cómics y Mangas</p>
+            </div>
           </div>
 
-          <!-- Perfil del Usuario Autenticado + Acciones de Sheet (Oculto por defecto) -->
-          <div id="user-profile-box" class="hidden items-center gap-2 pl-2.5 pr-1.5 py-1 rounded-xl bg-slate-900 border border-slate-800">
-            <img id="user-avatar" src="" alt="Avatar" class="w-7 h-7 rounded-lg object-cover border border-emerald-500/40 shrink-0" />
-            <div class="flex flex-col text-left max-w-[135px]">
-              <span id="user-display-name" class="text-xs font-semibold text-slate-200 truncate leading-tight">Usuario</span>
-              <span id="user-display-email" class="text-[10px] text-slate-400 truncate leading-tight">correo@gmail.com</span>
-            </div>
-            <a id="open-sheet-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition" title="Abrir mi hoja BiblioTrack_Registros en Google Sheets">
-              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-              <span>Ver mi Google Sheet</span>
-            </a>
-            <button onclick="manualSyncFromSheet()" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-sky-950/50 transition cursor-pointer" title="Sincronizar ahora con Google Sheets">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-            </button>
-            <button onclick="signOutGoogleSheets()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 transition cursor-pointer" title="Cerrar sesión">
-              <i data-lucide="log-out" class="w-4 h-4"></i>
-            </button>
-          </div>
+          <!-- Acción primaria rápida en móvil -->
+          <button onclick="openBookModal()" class="lg:hidden inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-600/25 transition shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Nueva Lectura</span>
+          </button>
         </div>
 
-        <!-- Menú Respaldo / Ejemplos -->
-        <div class="relative inline-block">
-          <button id="backup-menu-btn" onclick="toggleBackupMenu()" class="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-sm font-medium transition cursor-pointer" title="Opciones de datos y respaldo">
-            <i data-lucide="database" class="w-4 h-4 text-slate-400"></i>
-            <span class="hidden sm:inline">Datos</span>
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
+        <!-- Controles de Google Sheets + Lectura del Día + Nueva Lectura (Desktop) -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          <!-- Estado de conexión Google Sheets -->
+          <div id="authSection" class="flex items-center gap-2 flex-wrap">
+            <button id="btnGoogleSignIn" onclick="handleAuthClick()" class="inline-flex items-center gap-2 px-3 py-2 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"/>
+              </svg>
+              <span>Conectar Google Sheets</span>
+            </button>
+          </div>
+
+          <!-- Pill de usuario conectado (oculto por defecto) -->
+          <div id="connectedBar" class="hidden items-center gap-1.5 sm:gap-2 flex-wrap">
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs max-w-[190px] sm:max-w-[230px]">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+              <span id="userEmailLabel" class="truncate font-medium">Conectado</span>
+            </div>
+
+            <button id="btnSyncNow" onclick="syncWithGoogleSheets(true)" title="Sincronizar ahora" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition">
+              <svg id="syncIcon" class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span class="hidden sm:inline">Sincronizar</span>
+            </button>
+
+            <button onclick="handleSignoutClick()" title="Cerrar sesión" class="inline-flex items-center justify-center px-2.5 py-2 min-h-[40px] rounded-xl bg-slate-900 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-800/60 text-slate-400 hover:text-rose-300 text-xs transition">
+              Salir
+            </button>
+          </div>
+
+          <!-- Botón Lectura del Día -->
+          <button onclick="pickDailyRead()" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-semibold transition">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            <span>Lectura del Día</span>
           </button>
 
-          <div id="backup-menu" class="hidden absolute right-0 mt-2 w-60 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-40 animate-pop-in">
-            <button onclick="loadDemoData(); toggleBackupMenu();" class="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-800/80 flex items-center gap-2.5 transition">
-              <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
-              <span>Cargar ejemplos de prueba</span>
-            </button>
-            <button onclick="exportJSON(); toggleBackupMenu();" class="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-800/80 flex items-center gap-2.5 transition">
-              <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
-              <span>Exportar respaldo (JSON)</span>
-            </button>
-            <label class="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-800/80 flex items-center gap-2.5 transition cursor-pointer">
-              <i data-lucide="upload" class="w-4 h-4 text-sky-400"></i>
-              <span>Importar respaldo (JSON)</span>
-              <input type="file" id="import-json-input" accept=".json" class="hidden" onchange="importJSON(event)" />
-            </label>
-            <div class="my-1 border-t border-slate-800"></div>
-            <button onclick="askClearAllData(); toggleBackupMenu();" class="w-full px-4 py-2.5 text-left text-sm text-rose-400 hover:bg-rose-950/40 flex items-center gap-2.5 transition">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-              <span>Borrar toda la biblioteca</span>
-            </button>
-          </div>
+          <!-- Botón Nueva Lectura (Desktop) -->
+          <button onclick="openBookModal()" class="hidden lg:inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-[40px] rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-semibold shadow-md shadow-indigo-600/25 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Nueva Lectura</span>
+          </button>
         </div>
       </div>
     </div>
   </header>
 
   <!-- Contenido Principal -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5">
 
-    <!-- Panel de Estadísticas Rápidas -->
-    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" id="stats-panel">
-      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3.5">
-        <div class="w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
-          <i data-lucide="library" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <p class="text-xs font-medium text-slate-400">Total Registrados</p>
-          <p id="stat-total" class="text-2xl font-bold text-white">0</p>
-        </div>
+    <!-- Tarjetas de Resumen Rápido -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs font-medium text-slate-400">Total Obras</p>
+        <p id="statTotal" class="text-xl sm:text-2xl font-extrabold text-white mt-0.5">0</p>
       </div>
-
-      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3.5">
-        <div class="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-          <i data-lucide="book-open" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <p class="text-xs font-medium text-slate-400">En Progreso / Pendientes</p>
-          <p id="stat-inprogress" class="text-2xl font-bold text-white">0</p>
-        </div>
+      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs font-medium text-slate-400">Sagas / Series</p>
+        <p id="statSagas" class="text-xl sm:text-2xl font-extrabold text-indigo-400 mt-0.5">0</p>
       </div>
-
-      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3.5">
-        <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <p class="text-xs font-medium text-slate-400">Terminados</p>
-          <p id="stat-completed" class="text-2xl font-bold text-white">0</p>
-        </div>
+      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs font-medium text-slate-400">En Progreso</p>
+        <p id="statInProgress" class="text-xl sm:text-2xl font-extrabold text-amber-400 mt-0.5">0</p>
       </div>
-
-      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3.5">
-        <div class="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-          <i data-lucide="layers" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <p class="text-xs font-medium text-slate-400">Elegibles Hoy (Sagas OK)</p>
-          <p id="stat-eligible" class="text-2xl font-bold text-white">0</p>
-        </div>
+      <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs font-medium text-slate-400">Completados</p>
+        <p id="statCompleted" class="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-0.5">0</p>
       </div>
     </section>
 
-    <!-- Barra de Filtros y Búsqueda -->
-    <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-      <!-- Búsqueda -->
-      <div class="relative flex-1 max-w-md">
-        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-        <input type="text" id="search-input" oninput="renderLibrary()" placeholder="Buscar por título o nombre de saga..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
-      </div>
-
-      <!-- Filtros por Estado y Tipo -->
-      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-        <!-- Filtro Estado -->
-        <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800" role="group">
-          <button onclick="setStatusFilter('all')" id="filter-status-all" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white">Todos</button>
-          <button onclick="setStatusFilter('active')" id="filter-status-active" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">En progreso</button>
-          <button onclick="setStatusFilter('pending')" id="filter-status-pending" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Pendientes</button>
-          <button onclick="setStatusFilter('completed')" id="filter-status-completed" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Terminados</button>
+    <!-- Barra de Búsqueda, Selector de Vista (Sagas vs Individual) y Filtros Deslizables -->
+    <section class="space-y-3">
+      <div class="flex flex-col sm:flex-row gap-2.5 sm:items-center sm:justify-between">
+        <!-- Buscador -->
+        <div class="relative flex-1">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+          <input
+            id="searchInput"
+            type="text"
+            oninput="renderLibrary()"
+            placeholder="Buscar por título, saga o autor..."
+            class="w-full pl-10 pr-4 py-2.5 min-h-[42px] rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-100 placeholder-slate-500 outline-none transition"
+          />
         </div>
 
-        <!-- Filtro Tipo -->
-        <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800" role="group">
-          <button onclick="setTypeFilter('all')" id="filter-type-all" class="filter-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-800 text-white">Todos</button>
-          <button onclick="setTypeFilter('Libro')" id="filter-type-Libro" class="filter-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Libro</button>
-          <button onclick="setTypeFilter('Cómic')" id="filter-type-Cómic" class="filter-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Cómic</button>
-          <button onclick="setTypeFilter('Manga')" id="filter-type-Manga" class="filter-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Manga</button>
+        <!-- Selector de Modo de Vista: Agrupado por Sagas vs Vista Individual -->
+        <div class="inline-flex p-1 rounded-xl bg-slate-900 border border-slate-800 self-start sm:self-auto w-full sm:w-auto">
+          <button
+            id="btnViewGrouped"
+            onclick="setViewMode('grouped')"
+            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-2.25z" />
+            </svg>
+            <span>Agrupado por Sagas</span>
+          </button>
+          <button
+            id="btnViewIndividual"
+            onclick="setViewMode('individual')"
+            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200"
+          >
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+            </svg>
+            <span>Vista Individual</span>
+          </button>
         </div>
       </div>
-    </section>
 
-    <!-- Cuadrícula de Tarjetas de Lectura -->
-    <section id="library-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-      <!-- Las tarjetas se renderizan dinámicamente aquí -->
-    </section>
-
-    <!-- Estado Vacío -->
-    <section id="empty-state" class="hidden bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-10 text-center max-w-xl mx-auto my-8">
-      <div class="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto mb-4 text-indigo-400">
-        <i data-lucide="book-plus" class="w-8 h-8"></i>
-      </div>
-      <h3 class="text-lg font-bold text-white mb-2">Tu biblioteca está vacía o sin coincidencias</h3>
-      <p class="text-sm text-slate-400 mb-6 leading-relaxed">
-        Registra tus libros, cómics o mangas para llevar el control con barras de progreso dinámicas y descubrir qué leer hoy respetando el orden de tus sagas.
-      </p>
-      <div class="flex flex-wrap items-center justify-center gap-3">
-        <button onclick="openFormModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition cursor-pointer">
-          <i data-lucide="plus" class="w-4 h-4"></i> Agregar mi primer título
+      <!-- Filtros horizontales deslizables (mobile-friendly) -->
+      <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
+        <button onclick="setFilter('all')" data-filter="all" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-indigo-600 text-white transition">
+          Todos
         </button>
-        <button onclick="loadDemoData()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition cursor-pointer">
-          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i> Cargar ejemplos de sagas
+        <button onclick="setFilter('Libro')" data-filter="Libro" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition">
+          📚 Libros
+        </button>
+        <button onclick="setFilter('Cómic')" data-filter="Cómic" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition">
+          💥 Cómics
+        </button>
+        <button onclick="setFilter('Manga')" data-filter="Manga" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition">
+          ⛩️ Mangas
+        </button>
+        <button onclick="setFilter('in_progress')" data-filter="in_progress" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition">
+          ⏳ En progreso
+        </button>
+        <button onclick="setFilter('completed')" data-filter="completed" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition">
+          ✅ Completados
         </button>
       </div>
     </section>
+
+    <!-- Contenedor Principal de Sagas y Lecturas -->
+    <section id="libraryContainer" class="space-y-6">
+      <!-- Renderizado dinámicamente vía JS -->
+    </section>
+
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/70 py-5 mt-12 text-center text-xs text-slate-500">
-    <p id="footer-storage-note">BiblioTrack — Conecta tu cuenta de Google para crear y sincronizar tu propio Google Sheet o usa el modo local automático.</p>
-  </footer>
-
-  <!-- ===================================================================== -->
-  <!-- MODAL 1: FORMULARIO DE REGISTRO / EDICIÓN DE LECTURA                  -->
-  <!-- ===================================================================== -->
-  <div id="form-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-auto animate-pop-in">
-      <!-- Cabecera Modal -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-        <h2 id="form-modal-title" class="text-lg font-bold text-white flex items-center gap-2">
-          <i data-lucide="book-plus" class="w-5 h-5 text-indigo-400"></i>
-          <span>Registrar Nueva Lectura</span>
-        </h2>
-        <button onclick="closeFormModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <i data-lucide="x" class="w-5 h-5"></i>
+  <!-- Modal para Agregar / Editar Lectura -->
+  <div id="bookModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div class="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-slate-900/95 backdrop-blur border-b border-slate-800">
+        <h2 id="modalTitle" class="text-base sm:text-lg font-bold text-white">Nueva Lectura</h2>
+        <button onclick="closeBookModal()" class="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
 
-      <!-- Cuerpo Formulario -->
-      <form id="book-form" onsubmit="handleFormSubmit(event)" class="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
-        <input type="hidden" id="entry-id" />
+      <form id="bookForm" onsubmit="saveBook(event)" class="p-4 sm:p-6 space-y-4">
+        <input type="hidden" id="bookId" />
 
-        <!-- Fila Superior: Portada + Datos Principales -->
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-5">
-          <!-- Columna Izquierda: Miniatura / Portada -->
-          <div class="sm:col-span-4 flex flex-col items-center">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 w-full text-center sm:text-left">Portada / Miniatura</label>
+        <!-- Título -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Título de la obra *</label>
+          <input id="bookTitle" type="text" required placeholder="Ej. El Imperio Final" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+        </div>
 
-            <!-- Vista previa de portada -->
-            <div id="cover-preview-box" class="w-36 h-52 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden relative group shadow-inner">
-              <img id="cover-preview-img" src="" alt="Vista previa" class="hidden w-full h-full object-cover" />
-              <div id="cover-preview-placeholder" class="flex flex-col items-center justify-center text-slate-500 p-3 text-center">
-                <i data-lucide="image-plus" class="w-8 h-8 mb-1.5 text-slate-600"></i>
-                <span class="text-[11px] leading-tight">Sin portada</span>
-              </div>
-              <button type="button" id="clear-cover-btn" onclick="clearCoverImage()" class="hidden absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600/90 text-white hover:bg-rose-500 shadow transition" title="Quitar imagen">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
-
-            <!-- Botón subir archivo -->
-            <label class="mt-3 w-36 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 cursor-pointer transition">
-              <i data-lucide="upload" class="w-3.5 h-3.5 text-indigo-400"></i>
-              <span>Subir imagen</span>
-              <input type="file" id="cover-file-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)" />
-            </label>
-
-            <!-- O URL de imagen -->
-            <input type="url" id="cover-url-input" oninput="handleCoverUrlInput(this.value)" placeholder="O pega URL de imagen..." class="mt-2 w-36 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+        <!-- Tipo y Autor -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Formato *</label>
+            <select id="bookType" onchange="updateUnitLabels()" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none">
+              <option value="Libro">📚 Libro (Páginas)</option>
+              <option value="Cómic">💥 Cómic (Páginas)</option>
+              <option value="Manga">⛩️ Manga (Capítulos)</option>
+            </select>
           </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Autor / Mangaka</label>
+            <input id="bookAuthor" type="text" placeholder="Ej. Brandon Sanderson" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+          </div>
+        </div>
 
-          <!-- Columna Derecha: Título, Tipo y Saga -->
-          <div class="sm:col-span-8 space-y-4">
-            <!-- Nombre del título -->
+        <!-- Progreso Actual y Total -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label id="labelCurrentUnit" class="block text-xs font-semibold text-slate-300 mb-1.5">Páginas leídas</label>
+            <input id="bookCurrent" type="number" min="0" value="0" required class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+          </div>
+          <div>
+            <label id="labelTotalUnit" class="block text-xs font-semibold text-slate-300 mb-1.5">Total de páginas *</label>
+            <input id="bookTotal" type="number" min="1" value="100" required class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+          </div>
+        </div>
+
+        <!-- Sección de Saga / Serie -->
+        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-3">
+          <label class="flex items-center gap-3 cursor-pointer select-none min-h-[36px]">
+            <input id="bookIsSaga" type="checkbox" onchange="toggleSagaFields()" class="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 focus:ring-indigo-500" />
+            <span class="text-xs sm:text-sm font-semibold text-slate-200">Pertenece a una Saga o Serie</span>
+          </label>
+
+          <div id="sagaFieldsContainer" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-slate-400 mb-1">Nombre de la Saga *</label>
+              <input id="bookSagaName" list="existingSagasList" type="text" placeholder="Ej. Nacidos de la Bruma" class="w-full px-3 py-2.5 min-h-[42px] rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+              <datalist id="existingSagasList"></datalist>
+            </div>
             <div>
-              <label for="title-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Nombre del Título *</label>
-              <input type="text" id="title-input" required placeholder="Ej. El Imperio Final, Berserk Vol. 1, Watchmen..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
-            </div>
-
-            <!-- Tipo de obra -->
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Tipo de Obra *</label>
-              <div class="grid grid-cols-3 gap-2.5">
-                <label class="cursor-pointer">
-                  <input type="radio" name="work-type" value="Libro" class="peer sr-only" checked onchange="updatePlaceholderIcon()" />
-                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-indigo-500 peer-checked:bg-indigo-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
-                    <i data-lucide="book" class="w-4 h-4 text-indigo-400"></i>
-                    <span>Libro</span>
-                  </div>
-                </label>
-                <label class="cursor-pointer">
-                  <input type="radio" name="work-type" value="Cómic" class="peer sr-only" onchange="updatePlaceholderIcon()" />
-                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-amber-500 peer-checked:bg-amber-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
-                    <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
-                    <span>Cómic</span>
-                  </div>
-                </label>
-                <label class="cursor-pointer">
-                  <input type="radio" name="work-type" value="Manga" class="peer sr-only" onchange="updatePlaceholderIcon()" />
-                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-pink-500 peer-checked:bg-pink-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
-                    <i data-lucide="sparkles" class="w-4 h-4 text-pink-400"></i>
-                    <span>Manga</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <!-- Interruptor ¿Pertenece a una saga? -->
-            <div class="pt-1">
-              <label class="inline-flex items-center gap-3 cursor-pointer select-none">
-                <input type="checkbox" id="is-saga-checkbox" onchange="toggleSagaFields()" class="sr-only peer" />
-                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
-                <span class="text-sm font-medium text-slate-200">¿Pertenece a una saga o serie?</span>
-              </label>
-            </div>
-
-            <!-- Campos condicionales de Saga -->
-            <div id="saga-fields-container" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-indigo-500/30 animate-pop-in">
-              <div class="sm:col-span-2">
-                <label for="saga-name-input" class="block text-xs font-medium text-indigo-300 mb-1">Nombre de la Saga *</label>
-                <input type="text" id="saga-name-input" list="existing-sagas-list" placeholder="Ej. Nacidos de la Bruma" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
-                <datalist id="existing-sagas-list"></datalist>
-              </div>
-              <div>
-                <label for="saga-order-input" class="block text-xs font-medium text-indigo-300 mb-1"># Entrega *</label>
-                <input type="number" id="saga-order-input" min="1" step="1" value="1" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500" />
-              </div>
-              <p class="sm:col-span-3 text-[11px] text-slate-400">
-                La ruleta diaria solo recomendará la entrega con el número más bajo que aún no hayas terminado.
-              </p>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Orden / Tomo #</label>
+              <input id="bookSagaOrder" type="number" min="1" value="1" class="w-full px-3 py-2.5 min-h-[42px] rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
             </div>
           </div>
         </div>
 
-        <!-- Sección de Progreso: Páginas y Capítulos -->
-        <div class="border-t border-slate-800 pt-4">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Contadores de Lectura</span>
-            <span id="form-live-percent" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">Progreso: 0%</span>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- Bloque Páginas -->
-            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2.5">
-              <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
-                <i data-lucide="file-text" class="w-4 h-4 text-sky-400"></i>
-                <span>Páginas</span>
-              </div>
-              <div class="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label for="pages-read-input" class="block text-[11px] text-slate-400 mb-1">Leídas</label>
-                  <input type="number" id="pages-read-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label for="pages-total-input" class="block text-[11px] text-slate-400 mb-1">Totales</label>
-                  <input type="number" id="pages-total-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-500" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Bloque Capítulos -->
-            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2.5">
-              <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
-                <i data-lucide="bookmark" class="w-4 h-4 text-emerald-400"></i>
-                <span>Capítulos</span>
-              </div>
-              <div class="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label for="chapters-read-input" class="block text-[11px] text-slate-400 mb-1">Leídos</label>
-                  <input type="number" id="chapters-read-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label for="chapters-total-input" class="block text-[11px] text-slate-400 mb-1">Totales</label>
-                  <input type="number" id="chapters-total-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Vista previa de la barra de color dinámico -->
-          <div class="mt-3">
-            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-              <div id="form-live-bar" class="h-full progress-bar-fill rounded-full" style="width: 0%; background-color: hsl(0, 85%, 50%);"></div>
-            </div>
-          </div>
+        <!-- URL de Portada -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">URL de Portada (opcional)</label>
+          <input id="bookCover" type="url" placeholder="https://ejemplo.com/portada.jpg" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
         </div>
 
         <!-- Botones del Formulario -->
-        <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-          <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition cursor-pointer">
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeBookModal()" class="px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold transition">
             Cancelar
           </button>
-          <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-600/25 transition cursor-pointer">
+          <button type="submit" class="px-5 py-2.5 min-h-[44px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/25 transition">
             Guardar Lectura
           </button>
         </div>
@@ -479,1048 +343,788 @@
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- MODAL 2: SELECTOR ALEATORIO "LECTURA DEL DÍA"                         -->
-  <!-- ===================================================================== -->
-  <div id="daily-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-pop-in">
-      <!-- Cabecera -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-950/60 via-purple-950/50 to-slate-900">
-        <div class="flex items-center gap-2">
-          <span class="text-xl">🎲</span>
-          <h2 class="text-lg font-extrabold text-white">Lectura del Día</h2>
-        </div>
-        <button onclick="closeDailyModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <i data-lucide="x" class="w-5 h-5"></i>
+  <!-- Modal Lectura del Día -->
+  <div id="dailyModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4">
+    <div class="bg-slate-900 border border-amber-500/30 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl p-5 sm:p-6 text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+      </div>
+      <div>
+        <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Sugerencia Inteligente</span>
+        <h3 id="dailyBookTitle" class="text-lg sm:text-xl font-extrabold text-white mt-1">Título del Libro</h3>
+        <p id="dailyBookSubtitle" class="text-xs sm:text-sm text-slate-400 mt-1">Autor • Saga</p>
+      </div>
+      <div id="dailyBookProgressBox" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
+        Progreso actual
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+        <button onclick="pickDailyRead()" class="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold transition">
+          🎲 Elegir otra
+        </button>
+        <button onclick="closeDailyModal()" class="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold transition">
+          ¡A leer!
         </button>
       </div>
-
-      <!-- Contenido dinámico de ruleta / resultado -->
-      <div id="daily-modal-body" class="p-6 text-center">
-        <!-- Se rellena por JS -->
-      </div>
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- MODAL 3: CONFIRMACIÓN PERSONALIZADA (SIN confirm() NATIVO)            -->
-  <!-- ===================================================================== -->
-  <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-pop-in">
-      <div class="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-4">
-        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-      </div>
-      <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">¿Estás seguro?</h3>
-      <p id="confirm-message" class="text-sm text-slate-400 mb-6">Esta acción no se puede deshacer.</p>
-      <div class="flex items-center justify-end gap-3">
-        <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition">Cancelar</button>
-        <button id="confirm-action-btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold transition">Eliminar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- MODAL 4: AYUDA DE CONFIGURACIÓN DE GOOGLE CLIENT ID                   -->
-  <!-- ===================================================================== -->
-  <div id="setup-help-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden my-auto animate-pop-in">
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-        <h2 class="text-lg font-bold text-white flex items-center gap-2">
-          <i data-lucide="info" class="w-5 h-5 text-amber-400"></i>
-          <span>¿Cómo configurar mi Google Client ID?</span>
-        </h2>
-        <button onclick="closeSetupHelpModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <i data-lucide="x" class="w-5 h-5"></i>
+  <!-- Modal Confirmación de Eliminación (sin confirm()) -->
+  <div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-5 sm:p-6 space-y-4 shadow-2xl">
+      <h3 class="text-base sm:text-lg font-bold text-white">¿Eliminar esta lectura?</h3>
+      <p id="deleteModalText" class="text-xs sm:text-sm text-slate-400">Esta acción eliminará el registro de tu biblioteca.</p>
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button onclick="closeDeleteModal()" class="px-4 py-2.5 min-h-[42px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold transition">
+          Cancelar
+        </button>
+        <button id="confirmDeleteBtn" class="px-4 py-2.5 min-h-[42px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold transition">
+          Eliminar
         </button>
       </div>
-      <div class="p-6 space-y-4 text-sm text-slate-300 max-h-[80vh] overflow-y-auto">
-        <p class="text-slate-400">
-          Para que cada usuario pueda guardar sus registros en su propia hoja <strong>BiblioTrack_Registros</strong> de Google Sheets desde GitHub Pages, sigue estos pasos gratuitos una sola vez:
-        </p>
-        <ol class="list-decimal list-inside space-y-2.5 text-xs sm:text-sm text-slate-300 bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
-          <li>Entra a <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-indigo-400 underline font-semibold">Google Cloud Console</a> y crea un proyecto nuevo.</li>
-          <li>Ve a <strong>APIs y servicios → Biblioteca</strong> y habilita <strong>Google Drive API</strong> y <strong>Google Sheets API</strong>.</li>
-          <li>Ve a <strong>Pantalla de consentimiento de OAuth</strong> (tipo <em>Externo</em>), pon el nombre de tu app, tu correo y añade el alcance <code class="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300">.../auth/drive.file</code> (y añade a tus amigos en <em>Usuarios de prueba</em> si la app está en modo prueba).</li>
-          <li>Ve a <strong>Credenciales → Crear credenciales → ID de cliente de OAuth</strong> (tipo <em>Aplicación web</em>).</li>
-          <li>En <strong>Orígenes autorizados de JavaScript</strong>, agrega tu dominio de GitHub Pages (ej. <code class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300">https://tuusuario.github.io</code>).</li>
-          <li>Copia el <strong>ID de cliente</strong> y pégalo en la variable <code class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">GOOGLE_CLIENT_ID</code> al inicio del código JavaScript de este archivo.</li>
-        </ol>
-        <div class="flex justify-end pt-2">
-          <button onclick="closeSetupHelpModal()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition cursor-pointer">
-            Entendido
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 
-  <!-- Canvas oculto para redimensionar y comprimir miniaturas subidas -->
-  <canvas id="image-resizer-canvas" class="hidden"></canvas>
-
-  <!-- ===================================================================== -->
-  <!-- LÓGICA DE APLICACIÓN JAVASCRIPT + GOOGLE SHEETS & DRIVE API (OAUTH 2) -->
-  <!-- ===================================================================== -->
   <script>
     // =========================================================================
-    // CONFIGURACIÓN DE GOOGLE OAUTH 2.0
+    // CONFIGURACIÓN DE GOOGLE OAUTH 2.0 Y GOOGLE SHEETS API
     // =========================================================================
     const GOOGLE_CLIENT_ID = '453664187536-f4t5e02odju4f32mhe8ji0gsamad5sq6.apps.googleusercontent.com';
-
-    // Constantes de Google Drive & Google Sheets
-    const SPREADSHEET_NAME = 'BiblioTrack_Registros';
-    const SHEET_TAB_NAME = 'Registros';
-    const SHEET_HEADERS = [
-      'id',
-      'title',
-      'type',
-      'totalPages',
-      'readPages',
-      'totalChapters',
-      'readChapters',
-      'isSaga',
-      'sagaName',
-      'sagaOrder',
-      'coverUrl',
-      'updatedAt'
+    const DISCOVERY_DOCS = [
+      'https://sheets.googleapis.com/$discovery/rest?version=v4',
+      'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
     ];
-    // Scope seguro: solo da acceso a los archivos creados por BiblioTrack en el Drive del usuario
-    const OAUTH_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
+    const SPREADSHEET_TITLE = 'BiblioTrack_DB';
+    const SHEET_NAME = 'Lecturas';
+    const STORAGE_KEY = 'bibliotrack_books_v2';
+    const EXPANDED_SAGAS_KEY = 'bibliotrack_expanded_sagas';
 
-    // Claves de almacenamiento local y caché de portadas Base64
-    const STORAGE_KEY = 'bibliotrack_entries_v1';
-    const COVER_CACHE_KEY = 'bibliotrack_cover_cache_v1';
-    const SESSION_META_KEY = 'bibliotrack_google_session_v1';
-
-    // Detecta si ya se configuró un Client ID real
-    const isGoogleConfigured = Boolean(
-      GOOGLE_CLIENT_ID &&
-      !GOOGLE_CLIENT_ID.includes('TU_CLIENT_ID_AQUI') &&
-      GOOGLE_CLIENT_ID.includes('.apps.googleusercontent.com')
-    );
-
-    // Estado de sesión de Google
     let tokenClient = null;
+    let gapiInited = false;
+    let gisInited = false;
     let accessToken = null;
-    let userProfile = null;
-    let activeSpreadsheetId = null;
-    let isSyncingNow = false;
-    let pendingSyncReschedule = false;
+    let spreadsheetId = null;
 
-    // Estado global de la aplicación
-    let library = [];
-    let currentStatusFilter = 'all'; // 'all' | 'active' | 'pending' | 'completed'
-    let currentTypeFilter = 'all';   // 'all' | 'Libro' | 'Cómic' | 'Manga'
-    let currentBase64Cover = '';     // Almacena temporalmente la imagen procesada del formulario
-    let lastPickedId = null;         // Evita repetir exactamente el mismo libro al volver a sortear
+    // Estado de la aplicación
+    let books = [];
+    let currentFilter = 'all';
+    let viewMode = 'grouped'; // 'grouped' | 'individual'
+    let expandedSagas = new Set();
+    let bookIdToDelete = null;
 
     // =========================================================================
-    // 1. INICIALIZACIÓN DE GOOGLE IDENTITY SERVICES Y PERSISTENCIA HÍBRIDA
+    // INICIALIZACIÓN Y DATOS DE EJEMPLO
     // =========================================================================
-    function initGoogleAuth() {
-      // Cargar primero desde localStorage para renderizado instantáneo
-      loadFromLocalStorage();
+    window.addEventListener('DOMContentLoaded', () => {
+      loadLocalData();
       renderLibrary();
-
-      // Mostrar u ocultar botón de ayuda según si ya se pegó el Client ID
-      const helpBtn = document.getElementById('setup-help-btn');
-      if (helpBtn) {
-        helpBtn.classList.toggle('hidden', isGoogleConfigured);
-      }
-
-      if (!isGoogleConfigured) {
-        updateSyncUI('local_unconfigured');
-        return;
-      }
-
-      updateSyncUI('local');
-
-      // Esperar a que cargue el script de Google Identity Services
-      const waitForGsi = setInterval(() => {
-        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-          clearInterval(waitForGsi);
-          tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: OAUTH_SCOPES,
-            callback: handleOAuthTokenResponse
-          });
-
-          // Si el usuario tenía una sesión previa guardada, intentar reconexión silenciosa
-          const savedSession = getSavedSessionMeta();
-          if (savedSession && savedSession.email) {
-            try {
-              tokenClient.requestAccessToken({ prompt: '', login_hint: savedSession.email });
-            } catch (e) {
-              // Si requiere interacción manual, el usuario podrá pulsar el botón
-            }
-          }
-        }
-      }, 200);
-    }
-
-    /**
-     * Inicia el flujo OAuth 2.0 al pulsar "Conectar con Google Sheets"
-     */
-    window.connectGoogleSheets = function () {
-      if (!isGoogleConfigured) {
-        openSetupHelpModal();
-        showToast('Configura primero tu GOOGLE_CLIENT_ID para habilitar Google Sheets.', 'info');
-        return;
-      }
-
-      if (!tokenClient) {
-        showToast('Cargando servicios de Google, intenta de nuevo en un segundo...', 'info');
-        return;
-      }
-
-      tokenClient.requestAccessToken({ prompt: 'select_account' });
-    };
-
-    /**
-     * Callback tras obtener el Access Token de Google
-     */
-    async function handleOAuthTokenResponse(tokenResponse) {
-      if (tokenResponse.error) {
-        console.error('Error OAuth:', tokenResponse);
-        if (tokenResponse.error !== 'popup_closed_by_user' && tokenResponse.error !== 'access_denied') {
-          showToast('No se pudo autorizar el acceso con Google.', 'error');
-        }
-        return;
-      }
-
-      accessToken = tokenResponse.access_token;
-      updateSyncUI('syncing');
-
-      try {
-        // 1. Obtener perfil (correo y nombre) desde userinfo
-        const profileRes = await googleApiFetch('https://www.googleapis.com/oauth2/v3/userinfo');
-        userProfile = {
-          email: profileRes.email || '',
-          name: profileRes.name || profileRes.email || 'Usuario',
-          picture: profileRes.picture || ''
-        };
-        saveSessionMeta(userProfile);
-        updateAuthHeaderUI(userProfile);
-
-        // 2. Buscar o crear el Google Sheet "BiblioTrack_Registros" en Google Drive
-        await findOrCreateUserSpreadsheet();
-
-        // 3. Cargar registros desde la hoja (o subir los locales si la hoja está recién creada/vacía)
-        await syncFromSheetOnLogin();
-
-        showToast(`Conectado con ${userProfile.email}`, 'success');
-      } catch (err) {
-        console.error('Error conectando con Google Sheets:', err);
-        updateSyncUI('error');
-        showToast('Error al conectar con Google Drive/Sheets. Revisa tus permisos.', 'error');
-      }
-    }
-
-    window.signOutGoogleSheets = function () {
-      if (accessToken && window.google && window.google.accounts && window.google.accounts.oauth2) {
-        try {
-          window.google.accounts.oauth2.revoke(accessToken, () => {});
-        } catch (e) {}
-      }
-      accessToken = null;
-      userProfile = null;
-      activeSpreadsheetId = null;
-      localStorage.removeItem(SESSION_META_KEY);
-      updateAuthHeaderUI(null);
-      updateSyncUI('local');
-      showToast('Sesión de Google cerrada. Sigues en modo local.', 'info');
-    };
-
-    function updateAuthHeaderUI(profile) {
-      const loginGroup = document.getElementById('google-login-group');
-      const profileBox = document.getElementById('user-profile-box');
-      const avatarImg = document.getElementById('user-avatar');
-      const nameSpan = document.getElementById('user-display-name');
-      const emailSpan = document.getElementById('user-display-email');
-
-      if (profile) {
-        loginGroup.classList.add('hidden');
-        profileBox.classList.remove('hidden');
-        profileBox.classList.add('flex');
-        nameSpan.textContent = profile.name;
-        emailSpan.textContent = profile.email;
-        avatarImg.src = profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=10b981&color=fff`;
-      } else {
-        loginGroup.classList.remove('hidden');
-        profileBox.classList.add('hidden');
-        profileBox.classList.remove('flex');
-        const sheetLink = document.getElementById('open-sheet-link');
-        if (sheetLink) sheetLink.href = '#';
-      }
-      lucide.createIcons();
-    }
-
-    function updateSyncUI(state) {
-      const dot = document.getElementById('sync-status-dot');
-      const text = document.getElementById('sync-status-text');
-      const footerNote = document.getElementById('footer-storage-note');
-
-      if (state === 'synced') {
-        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
-        text.textContent = 'Google Sheet Activo';
-        text.className = 'text-emerald-300 font-semibold';
-        if (footerNote) footerNote.textContent = `BiblioTrack — Sincronizado con tu hoja "${SPREADSHEET_NAME}" en Google Drive.`;
-      } else if (state === 'syncing') {
-        dot.className = 'w-2 h-2 rounded-full bg-sky-400 animate-ping';
-        text.textContent = 'Sincronizando...';
-        text.className = 'text-sky-300 font-semibold';
-      } else if (state === 'error') {
-        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
-        text.textContent = 'Error Sync';
-        text.className = 'text-rose-300 font-semibold';
-      } else {
-        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-        text.textContent = 'Modo Local';
-        text.className = 'text-slate-400';
-        if (footerNote) footerNote.textContent = 'BiblioTrack — Guardado localmente. Conecta tu Google Sheet para sincronizar entre dispositivos.';
-      }
-    }
-
-    // =========================================================================
-    // 2. GOOGLE DRIVE API & GOOGLE SHEETS API (LECTURA Y ESCRITURA)
-    // =========================================================================
-    async function googleApiFetch(url, options = {}) {
-      if (!accessToken) throw new Error('Sin token de acceso');
-      const headers = {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      };
-      const res = await fetch(url, { ...options, headers });
-      if (res.status === 401) {
-        // Token expirado
-        accessToken = null;
-        updateSyncUI('error');
-        showToast('Tu sesión de Google expiró. Pulsa "Conectar con Google Sheets" nuevamente.', 'error');
-        throw new Error('Token expirado (401)');
-      }
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Google API Error (${res.status}): ${errText}`);
-      }
-      return res.json();
-    }
-
-    /**
-     * Busca en Drive un spreadsheet llamado "BiblioTrack_Registros" no eliminado;
-     * si no existe, lo crea con la pestaña "Registros" y los encabezados formateados.
-     */
-    async function findOrCreateUserSpreadsheet() {
-      const query = encodeURIComponent(
-        `name = '${SPREADSHEET_NAME}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
-      );
-      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink)&orderBy=modifiedTime desc`;
-      const searchData = await googleApiFetch(searchUrl);
-
-      if (searchData.files && searchData.files.length > 0) {
-        activeSpreadsheetId = searchData.files[0].id;
-        const sheetLink = document.getElementById('open-sheet-link');
-        if (sheetLink) {
-          sheetLink.href = searchData.files[0].webViewLink || `https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit`;
-        }
-        await ensureSheetTabAndHeaders();
-        return;
-      }
-
-      // Crear nuevo Google Sheet mediante Sheets API v4
-      const createPayload = {
-        properties: {
-          title: SPREADSHEET_NAME
-        },
-        sheets: [
-          {
-            properties: {
-              title: SHEET_TAB_NAME,
-              gridProperties: {
-                frozenRowCount: 1
-              }
-            }
-          }
-        ]
-      };
-
-      const created = await googleApiFetch('https://sheets.googleapis.com/v4/spreadsheets', {
-        method: 'POST',
-        body: JSON.stringify(createPayload)
-      });
-
-      activeSpreadsheetId = created.spreadsheetId;
-      const sheetId = created.sheets[0].properties.sheetId;
-
-      const sheetLink = document.getElementById('open-sheet-link');
-      if (sheetLink) {
-        sheetLink.href = created.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit`;
-      }
-
-      // Escribir fila de encabezados en A1:L1
-      await googleApiFetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}?valueInputOption=RAW`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ values: [SHEET_HEADERS] })
-        }
-      );
-
-      // Dar formato visual profesional a la fila de encabezados (negrita y fondo oscuro)
-      await googleApiFetch(`https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}:batchUpdate`, {
-        method: 'POST',
-        body: JSON.stringify({
-          requests: [
-            {
-              repeatCell: {
-                range: {
-                  sheetId,
-                  startRowIndex: 0,
-                  endRowIndex: 1,
-                  startColumnIndex: 0,
-                  endColumnIndex: SHEET_HEADERS.length
-                },
-                cell: {
-                  userEnteredFormat: {
-                    backgroundColor: { red: 0.12, green: 0.16, blue: 0.25 },
-                    textFormat: {
-                      foregroundColor: { red: 1, green: 1, blue: 1 },
-                      bold: true
-                    }
-                  }
-                },
-                fields: 'userEnteredFormat(backgroundColor,textFormat)'
-              }
-            }
-          ]
-        })
-      });
-    }
-
-    async function ensureSheetTabAndHeaders() {
-      const meta = await googleApiFetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}?fields=sheets.properties`
-      );
-      const hasTab = (meta.sheets || []).some(s => s.properties && s.properties.title === SHEET_TAB_NAME);
-      if (!hasTab) {
-        await googleApiFetch(`https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}:batchUpdate`, {
-          method: 'POST',
-          body: JSON.stringify({
-            requests: [{ addSheet: { properties: { title: SHEET_TAB_NAME, gridProperties: { frozenRowCount: 1 } } } }]
-          })
-        });
-      }
-
-      const headerRes = await googleApiFetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}`
-      );
-      if (!headerRes.values || headerRes.values.length === 0) {
-        await googleApiFetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}?valueInputOption=RAW`,
-          {
-            method: 'PUT',
-            body: JSON.stringify({ values: [SHEET_HEADERS] })
-          }
-        );
-      }
-    }
-
-    /**
-     * Al iniciar sesión: lee todas las filas del Sheet. Si está vacío y existen
-     * registros locales previos, sube automáticamente esos registros locales al Sheet.
-     */
-    async function syncFromSheetOnLogin() {
-      const rows = await readAllRowsFromSheet();
-      if (rows.length === 0) {
-        const localBackup = getLocalStorageData();
-        if (localBackup.length > 0) {
-          library = localBackup;
-          await writeAllRowsToSheet(library);
-          renderLibrary();
-          showToast(`Se subieron ${localBackup.length} lecturas locales a tu nuevo Google Sheet.`, 'success');
-          return;
-        }
-      }
-
-      library = rows;
-      saveToLocalStorageOnly(library);
-      updateSyncUI('synced');
-      renderLibrary();
-    }
-
-    /**
-     * Botón manual "Sincronizar ahora"
-     */
-    window.manualSyncFromSheet = async function () {
-      if (!accessToken || !activeSpreadsheetId) {
-        connectGoogleSheets();
-        return;
-      }
-      try {
-        updateSyncUI('syncing');
-        const rows = await readAllRowsFromSheet();
-        library = rows;
-        saveToLocalStorageOnly(library);
-        updateSyncUI('synced');
-        renderLibrary();
-        showToast('Biblioteca actualizada desde tu Google Sheet.', 'success');
-      } catch (err) {
-        console.error(err);
-        updateSyncUI('error');
-        showToast('Error al leer tu Google Sheet.', 'error');
-      }
-    };
-
-    async function readAllRowsFromSheet() {
-      const range = encodeURIComponent(`${SHEET_TAB_NAME}!A2:L`);
-      const data = await googleApiFetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${range}`
-      );
-      const values = data.values || [];
-      const coverCache = getCoverCache();
-
-      return values
-        .filter(row => row && row[0] && row[1])
-        .map(row => {
-          const id = String(row[0]);
-          const rawCover = String(row[10] || '');
-          let resolvedCover = rawCover;
-
-          // Si la celda contiene el marcador de portada local grande, recuperarla del caché local
-          if (rawCover.startsWith('LOCAL_CACHE:')) {
-            resolvedCover = coverCache[id] || '';
-          } else if (rawCover.startsWith('data:image')) {
-            // Guardar también en caché local por seguridad
-            saveCoverToCache(id, rawCover);
-          }
-
-          return {
-            id,
-            title: String(row[1] || ''),
-            type: String(row[2] || 'Libro'),
-            pagesTotal: Number(row[3]) || 0,
-            pagesRead: Number(row[4]) || 0,
-            chaptersTotal: Number(row[5]) || 0,
-            chaptersRead: Number(row[6]) || 0,
-            isSaga: String(row[7]).toUpperCase() === 'TRUE' || row[7] === '1' || row[7] === 'Sí',
-            sagaName: String(row[8] || ''),
-            sagaOrder: Math.max(1, Number(row[9]) || 1),
-            cover: resolvedCover,
-            updatedAt: Number(row[11]) || Date.now()
-          };
-        });
-    }
-
-    /**
-     * Escribe el estado completo en la pestaña "Registros" de Google Sheets.
-     * Maneja colas para evitar conflictos si el usuario pulsa "+1 Pág" varias veces seguidas.
-     */
-    async function writeAllRowsToSheet(booksList) {
-      if (!accessToken || !activeSpreadsheetId) return;
-
-      if (isSyncingNow) {
-        pendingSyncReschedule = true;
-        return;
-      }
-
-      isSyncingNow = true;
-      updateSyncUI('syncing');
-
-      try {
-        const rows = booksList.map(book => {
-          let sheetCoverValue = book.cover || '';
-          // Google Sheets tiene un límite estricto de 50,000 caracteres por celda.
-          // Si la portada Base64 supera 45,000 caracteres, la guardamos en el caché local indexado por ID
-          // y colocamos un marcador ligero en la celda para no romper la sincronización.
-          if (sheetCoverValue.startsWith('data:image')) {
-            saveCoverToCache(book.id, sheetCoverValue);
-            if (sheetCoverValue.length > 45000) {
-              sheetCoverValue = `LOCAL_CACHE:${book.id}`;
-            }
-          }
-
-          return [
-            book.id,
-            book.title,
-            book.type || 'Libro',
-            Number(book.pagesTotal) || 0,
-            Number(book.pagesRead) || 0,
-            Number(book.chaptersTotal) || 0,
-            Number(book.chaptersRead) || 0,
-            book.isSaga ? 'TRUE' : 'FALSE',
-            book.isSaga ? (book.sagaName || '') : '',
-            book.isSaga ? (Number(book.sagaOrder) || 1) : 1,
-            sheetCoverValue,
-            Number(book.updatedAt) || Date.now()
-          ];
-        });
-
-        // 1. Limpiar filas anteriores A2:L
-        await googleApiFetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A2:L')}:clear`,
-          { method: 'POST', body: JSON.stringify({}) }
-        );
-
-        // 2. Escribir encabezados y todas las filas actualizadas en A1:L
-        const allValues = [SHEET_HEADERS, ...rows];
-        await googleApiFetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L' + allValues.length)}?valueInputOption=RAW`,
-          {
-            method: 'PUT',
-            body: JSON.stringify({ values: allValues })
-          }
-        );
-
-        updateSyncUI('synced');
-      } catch (err) {
-        console.error('Error sincronizando filas con Google Sheets:', err);
-        updateSyncUI('error');
-        showToast('Error al sincronizar cambios con tu Google Sheet.', 'error');
-      } finally {
-        isSyncingNow = false;
-        if (pendingSyncReschedule) {
-          pendingSyncReschedule = false;
-          writeAllRowsToSheet(library);
-        }
-      }
-    }
-
-    // =========================================================================
-    // CACHÉ LOCAL DE PORTADAS Y OPERACIONES CRUD HÍBRIDAS
-    // =========================================================================
-    function getCoverCache() {
-      try {
-        const raw = localStorage.getItem(COVER_CACHE_KEY);
-        return raw ? JSON.parse(raw) : {};
-      } catch (e) {
-        return {};
-      }
-    }
-
-    function saveCoverToCache(id, base64Str) {
-      try {
-        const cache = getCoverCache();
-        cache[id] = base64Str;
-        localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
-      } catch (e) {}
-    }
-
-    function removeCoverFromCache(id) {
-      try {
-        const cache = getCoverCache();
-        delete cache[id];
-        localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
-      } catch (e) {}
-    }
-
-    function getSavedSessionMeta() {
-      try {
-        const raw = localStorage.getItem(SESSION_META_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function saveSessionMeta(meta) {
-      try {
-        localStorage.setItem(SESSION_META_KEY, JSON.stringify(meta));
-      } catch (e) {}
-    }
-
-    function getLocalStorageData() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
-      } catch (err) {
-        return [];
-      }
-    }
-
-    function loadFromLocalStorage() {
-      library = getLocalStorageData();
-    }
-
-    function saveToLocalStorageOnly(data) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (err) {
-        console.error('Error al guardar en localStorage:', err);
-      }
-    }
-
-    async function persistBookEntry(bookObj) {
-      const idx = library.findIndex(b => b.id === bookObj.id);
-      if (idx !== -1) {
-        library[idx] = bookObj;
-      } else {
-        library.unshift(bookObj);
-      }
-
-      if (bookObj.cover && bookObj.cover.startsWith('data:image')) {
-        saveCoverToCache(bookObj.id, bookObj.cover);
-      }
-
-      saveToLocalStorageOnly(library);
-      renderLibrary();
-
-      if (accessToken && activeSpreadsheetId) {
-        await writeAllRowsToSheet(library);
-      }
-    }
-
-    async function removeBookEntry(bookId) {
-      library = library.filter(b => b.id !== bookId);
-      removeCoverFromCache(bookId);
-      saveToLocalStorageOnly(library);
-      renderLibrary();
-
-      if (accessToken && activeSpreadsheetId) {
-        await writeAllRowsToSheet(library);
-      }
-    }
-
-    async function replaceAllBooks(newList) {
-      library = newList;
-      saveToLocalStorageOnly(library);
-      renderLibrary();
-
-      if (accessToken && activeSpreadsheetId) {
-        await writeAllRowsToSheet(library);
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      initGoogleAuth();
-      lucide.createIcons();
-
-      // Cerrar menú desplegable de respaldo al hacer clic fuera
-      document.addEventListener('click', (e) => {
-        const menu = document.getElementById('backup-menu');
-        const btn = document.getElementById('backup-menu-btn');
-        if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
-          menu.classList.add('hidden');
-        }
-      });
+      initGoogleScripts();
     });
 
-    // =========================================================================
-    // 3. CÁLCULOS DE PROGRESO, COLOR HSL Y ESTADO COMPLETADO
-    // =========================================================================
-    function calculateProgress(item) {
-      const pTotal = Number(item.pagesTotal) || 0;
-      const pRead = Number(item.pagesRead) || 0;
-      const cTotal = Number(item.chaptersTotal) || 0;
-      const cRead = Number(item.chaptersRead) || 0;
+    function loadLocalData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          books = JSON.parse(saved);
+        } else {
+          // Datos iniciales de demostración con sagas y obras independientes
+          books = [
+            {
+              id: 'demo-1',
+              title: 'El Imperio Final',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 688,
+              total: 688,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 1,
+              cover: ''
+            },
+            {
+              id: 'demo-2',
+              title: 'El Pozo de la Ascensión',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 310,
+              total: 800,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 2,
+              cover: ''
+            },
+            {
+              id: 'demo-3',
+              title: 'El Héroe de las Eras',
+              type: 'Libro',
+              author: 'Brandon Sanderson',
+              current: 0,
+              total: 760,
+              isSaga: true,
+              sagaName: 'Nacidos de la Bruma',
+              sagaOrder: 3,
+              cover: ''
+            },
+            {
+              id: 'demo-4',
+              title: 'Chainsaw Man Vol. 1',
+              type: 'Manga',
+              author: 'Tatsuki Fujimoto',
+              current: 7,
+              total: 7,
+              isSaga: true,
+              sagaName: 'Chainsaw Man',
+              sagaOrder: 1,
+              cover: ''
+            },
+            {
+              id: 'demo-5',
+              title: 'Chainsaw Man Vol. 2',
+              type: 'Manga',
+              author: 'Tatsuki Fujimoto',
+              current: 4,
+              total: 9,
+              isSaga: true,
+              sagaName: 'Chainsaw Man',
+              sagaOrder: 2,
+              cover: ''
+            },
+            {
+              id: 'demo-6',
+              title: 'Proyecto Hail Mary',
+              type: 'Libro',
+              author: 'Andy Weir',
+              current: 195,
+              total: 528,
+              isSaga: false,
+              sagaName: '',
+              sagaOrder: 1,
+              cover: ''
+            }
+          ];
+          saveLocalData();
+        }
 
-      let percent = 0;
-      let isCompleted = false;
-      let basis = 'none';
+        const savedExpanded = localStorage.getItem(EXPANDED_SAGAS_KEY);
+        if (savedExpanded) {
+          expandedSagas = new Set(JSON.parse(savedExpanded));
+        }
+      } catch (e) {
+        console.error('Error cargando localStorage:', e);
+        books = [];
+      }
+    }
 
-      if (pTotal > 0 && cTotal > 0) {
-        const pagePct = Math.min(100, Math.max(0, (pRead / pTotal) * 100));
-        isCompleted = (pRead >= pTotal) || (cRead >= cTotal);
-        percent = isCompleted ? 100 : Math.round(pagePct);
-        basis = 'pages';
-      } else if (pTotal > 0) {
-        isCompleted = pRead >= pTotal;
-        percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100)));
-        basis = 'pages';
-      } else if (cTotal > 0) {
-        isCompleted = cRead >= cTotal;
-        percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((cRead / cTotal) * 100)));
-        basis = 'chapters';
-      } else {
-        percent = 0;
-        isCompleted = false;
+    function saveLocalData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+        localStorage.setItem(EXPANDED_SAGAS_KEY, JSON.stringify([...expandedSagas]));
+      } catch (e) {
+        console.error('Error guardando localStorage:', e);
+      }
+    }
+
+    // =========================================================================
+    // GOOGLE IDENTITY SERVICES Y SHEETS SYNC
+    // =========================================================================
+    function initGoogleScripts() {
+      const checkInterval = setInterval(() => {
+        if (typeof gapi !== 'undefined' && !gapiInited) {
+          gapi.load('client', async () => {
+            try {
+              await gapi.client.init({ discoveryDocs: DISCOVERY_DOCS });
+              gapiInited = true;
+            } catch (err) {
+              console.error('Error inicializando gapi.client:', err);
+            }
+          });
+        }
+
+        if (typeof google !== 'undefined' && google.accounts && !gisInited) {
+          try {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: GOOGLE_CLIENT_ID,
+              scope: SCOPES,
+              callback: async (tokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                  accessToken = tokenResponse.access_token;
+                  gapi.client.setToken({ access_token: accessToken });
+                  await onGoogleConnected();
+                }
+              },
+            });
+            gisInited = true;
+          } catch (err) {
+            console.error('Error inicializando GIS:', err);
+          }
+        }
+
+        if (gapiInited && gisInited) {
+          clearInterval(checkInterval);
+        }
+      }, 300);
+    }
+
+    function handleAuthClick() {
+      if (!tokenClient) {
+        showToast('Cargando servicios de Google, intenta en un segundo...', 'info');
+        return;
+      }
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+
+    function handleSignoutClick() {
+      if (accessToken && typeof google !== 'undefined') {
+        google.accounts.oauth2.revoke(accessToken, () => {});
+      }
+      accessToken = null;
+      spreadsheetId = null;
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('connectedBar').classList.add('hidden');
+      document.getElementById('connectedBar').classList.remove('flex');
+      showToast('Sesión de Google cerrada', 'info');
+    }
+
+    async function onGoogleConnected() {
+      document.getElementById('authSection').classList.add('hidden');
+      const connectedBar = document.getElementById('connectedBar');
+      connectedBar.classList.remove('hidden');
+      connectedBar.classList.add('flex');
+
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (res.ok) {
+          const profile = await res.json();
+          document.getElementById('userEmailLabel').textContent = profile.email || 'Conectado';
+        }
+      } catch (e) {
+        console.warn('No se pudo obtener el perfil:', e);
       }
 
-      return { percent, isCompleted, basis };
+      await syncWithGoogleSheets(true);
     }
 
-    /**
-     * Interpolación HSL de Rojo (hue = 0) en 0% a Verde (hue = 120) en 100%
-     */
-    function getProgressColorHSL(percent) {
-      const clamped = Math.min(100, Math.max(0, percent));
-      const hue = Math.round((clamped / 100) * 120);
-      return `hsl(${hue}, 82%, 48%)`;
+    async function findOrCreateSpreadsheet() {
+      if (spreadsheetId) return spreadsheetId;
+
+      const query = `name='${SPREADSHEET_TITLE}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+      const searchRes = await gapi.client.drive.files.list({
+        q: query,
+        fields: 'files(id, name)',
+        spaces: 'drive'
+      });
+
+      const files = searchRes.result.files;
+      if (files && files.length > 0) {
+        spreadsheetId = files[0].id;
+        return spreadsheetId;
+      }
+
+      const createRes = await gapi.client.sheets.spreadsheets.create({
+        resource: {
+          properties: { title: SPREADSHEET_TITLE },
+          sheets: [{ properties: { title: SHEET_NAME } }]
+        }
+      });
+
+      spreadsheetId = createRes.result.spreadsheetId;
+
+      // Escribir encabezados iniciales
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${SHEET_NAME}!A1:J1`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[
+            'id', 'title', 'type', 'author', 'current', 'total', 'isSaga', 'sagaName', 'sagaOrder', 'cover'
+          ]]
+        }
+      });
+
+      return spreadsheetId;
+    }
+
+    async function syncWithGoogleSheets(pullFirst = false) {
+      if (!accessToken) return;
+      const syncIcon = document.getElementById('syncIcon');
+      syncIcon.classList.add('animate-spin');
+
+      try {
+        const sheetId = await findOrCreateSpreadsheet();
+
+        if (pullFirst) {
+          const getRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `${SHEET_NAME}!A2:J`
+          });
+
+          const rows = getRes.result.values || [];
+          if (rows.length > 0) {
+            books = rows.map(r => ({
+              id: r[0] || crypto.randomUUID(),
+              title: r[1] || 'Sin título',
+              type: r[2] || 'Libro',
+              author: r[3] || '',
+              current: Number(r[4]) || 0,
+              total: Math.max(1, Number(r[5]) || 1),
+              isSaga: String(r[6]).toLowerCase() === 'true',
+              sagaName: r[7] || '',
+              sagaOrder: Math.max(1, Number(r[8]) || 1),
+              cover: r[9] || ''
+            }));
+            saveLocalData();
+            renderLibrary();
+          } else if (books.length > 0) {
+            await pushAllToSheets(sheetId);
+          }
+        } else {
+          await pushAllToSheets(sheetId);
+        }
+
+        showToast('Sincronizado con Google Sheets', 'success');
+      } catch (err) {
+        console.error('Error sincronizando con Google Sheets:', err);
+        showToast('Error al sincronizar con Google Sheets', 'error');
+      } finally {
+        syncIcon.classList.remove('animate-spin');
+      }
+    }
+
+    async function pushAllToSheets(sheetId) {
+      const targetId = sheetId || (await findOrCreateSpreadsheet());
+      const rows = books.map(b => [
+        b.id,
+        b.title,
+        b.type,
+        b.author || '',
+        b.current,
+        b.total,
+        b.isSaga ? 'TRUE' : 'FALSE',
+        b.sagaName || '',
+        b.sagaOrder || 1,
+        b.cover || ''
+      ]);
+
+      await gapi.client.sheets.spreadsheets.values.clear({
+        spreadsheetId: targetId,
+        range: `${SHEET_NAME}!A2:J`
+      });
+
+      if (rows.length > 0) {
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: targetId,
+          range: `${SHEET_NAME}!A2:J${rows.length + 1}`,
+          valueInputOption: 'RAW',
+          resource: { values: rows }
+        });
+      }
     }
 
     // =========================================================================
-    // 4. LÓGICA DE SAGAS Y ELEGIBILIDAD PARA "LECTURA DEL DÍA"
+    // UTILIDADES DE PROGRESO, COLOR HSL Y NORMALIZACIÓN DE SAGAS
     // =========================================================================
-    function normalizeSagaName(name) {
+    function normalizeSagaKey(name) {
       return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
 
-    function getEligibleDailyBooks() {
-      const eligible = [];
-      const sagaGroups = new Map();
-
-      for (const item of library) {
-        const { isCompleted } = calculateProgress(item);
-
-        if (item.isSaga && item.sagaName && item.sagaName.trim() !== '') {
-          const normKey = normalizeSagaName(item.sagaName);
-          if (!sagaGroups.has(normKey)) {
-            sagaGroups.set(normKey, []);
-          }
-          sagaGroups.get(normKey).push({ item, isCompleted });
-        } else {
-          if (!isCompleted) {
-            eligible.push(item);
-          }
-        }
-      }
-
-      for (const [, entries] of sagaGroups.entries()) {
-        entries.sort((a, b) => (Number(a.item.sagaOrder) || 1) - (Number(b.item.sagaOrder) || 1));
-        const nextInSaga = entries.find(entry => !entry.isCompleted);
-        if (nextInSaga) {
-          eligible.push(nextInSaga.item);
-        }
-      }
-
-      return eligible;
+    function getProgressPercentage(current, total) {
+      if (!total || total <= 0) return 0;
+      return Math.min(100, Math.max(0, Math.round((current / total) * 100)));
     }
 
-    function getSagaLockInfo(targetItem) {
-      if (!targetItem.isSaga || !targetItem.sagaName) return { isLocked: false };
-      const { isCompleted } = calculateProgress(targetItem);
-      if (isCompleted) return { isLocked: false };
+    // Gradiente HSL dinámico: Rojo (0deg) -> Ámbar (45deg) -> Verde Esmeralda (142deg)
+    function getProgressHslColor(percent) {
+      const hue = Math.round((percent / 100) * 142);
+      return `hsl(${hue}, 82%, 48%)`;
+    }
 
-      const normKey = normalizeSagaName(targetItem.sagaName);
-      const sameSaga = library
-        .filter(b => b.isSaga && normalizeSagaName(b.sagaName) === normKey)
-        .sort((a, b) => (Number(a.sagaOrder) || 1) - (Number(b.sagaOrder) || 1));
+    function getUnitLabel(type, plural = true) {
+      if (type === 'Manga') return plural ? 'caps' : 'Cap';
+      return plural ? 'págs' : 'Pág';
+    }
 
-      const firstUnfinished = sameSaga.find(b => !calculateProgress(b).isCompleted);
-      if (firstUnfinished && firstUnfinished.id !== targetItem.id) {
-        return {
-          isLocked: true,
-          blockedByOrder: firstUnfinished.sagaOrder,
-          blockedByTitle: firstUnfinished.title
-        };
-      }
-      return { isLocked: false };
+    function getTypeBadgeHtml(type) {
+      const styles = {
+        'Libro': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+        'Cómic': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        'Manga': 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
+      };
+      const icons = { 'Libro': '📚', 'Cómic': '💥', 'Manga': '⛩️' };
+      const cls = styles[type] || styles['Libro'];
+      return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${cls}">${icons[type] || '📖'} ${type}</span>`;
     }
 
     // =========================================================================
-    // 5. RENDERIZADO DE LA BIBLIOTECA Y ESTADÍSTICAS
+    // FILTROS Y CAMBIO DE MODO DE VISTA
     // =========================================================================
-    window.setStatusFilter = function (status) {
-      currentStatusFilter = status;
-      document.querySelectorAll('.filter-status-btn').forEach(btn => {
-        btn.classList.remove('bg-indigo-600', 'text-white');
-        btn.classList.add('text-slate-400');
-      });
-      const activeBtn = document.getElementById(`filter-status-${status}`);
-      if (activeBtn) {
-        activeBtn.classList.add('bg-indigo-600', 'text-white');
-        activeBtn.classList.remove('text-slate-400');
+    function setViewMode(mode) {
+      viewMode = mode;
+      const btnGrouped = document.getElementById('btnViewGrouped');
+      const btnIndividual = document.getElementById('btnViewIndividual');
+
+      if (mode === 'grouped') {
+        btnGrouped.className = 'flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm';
+        btnIndividual.className = 'flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200';
+      } else {
+        btnIndividual.className = 'flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm';
+        btnGrouped.className = 'flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200';
       }
       renderLibrary();
-    };
+    }
 
-    window.setTypeFilter = function (type) {
-      currentTypeFilter = type;
-      document.querySelectorAll('.filter-type-btn').forEach(btn => {
-        btn.classList.remove('bg-slate-800', 'text-white');
-        btn.classList.add('text-slate-400');
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        const isActive = btn.dataset.filter === filter;
+        btn.className = isActive
+          ? 'filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition'
+          : 'filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700 transition';
       });
-      const activeBtn = document.getElementById(`filter-type-${type}`);
-      if (activeBtn) {
-        activeBtn.classList.add('bg-slate-800', 'text-white');
-        activeBtn.classList.remove('text-slate-400');
-      }
       renderLibrary();
-    };
+    }
 
+    function toggleSagaExpand(sagaKey) {
+      if (expandedSagas.has(sagaKey)) {
+        expandedSagas.delete(sagaKey);
+      } else {
+        expandedSagas.add(sagaKey);
+      }
+      saveLocalData();
+      renderLibrary();
+    }
+
+    // =========================================================================
+    // RENDERIZADO PRINCIPAL (AGRUPADO POR SAGAS + VISTA INDIVIDUAL)
+    // =========================================================================
     function updateStats() {
-      const total = library.length;
-      let completed = 0;
-      for (const item of library) {
-        if (calculateProgress(item).isCompleted) completed++;
-      }
-      const inProgress = total - completed;
-      const eligibleCount = getEligibleDailyBooks().length;
+      const total = books.length;
+      const completed = books.filter(b => b.current >= b.total).length;
+      const inProgress = books.filter(b => b.current > 0 && b.current < b.total).length;
+      const uniqueSagas = new Set(
+        books
+          .filter(b => b.isSaga && normalizeSagaKey(b.sagaName))
+          .map(b => normalizeSagaKey(b.sagaName))
+      );
 
-      document.getElementById('stat-total').textContent = total;
-      document.getElementById('stat-inprogress').textContent = inProgress;
-      document.getElementById('stat-completed').textContent = completed;
-      document.getElementById('stat-eligible').textContent = eligibleCount;
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statSagas').textContent = uniqueSagas.size;
+      document.getElementById('statInProgress').textContent = inProgress;
+      document.getElementById('statCompleted').textContent = completed;
     }
 
-    function getTypeBadgeHTML(type) {
-      if (type === 'Cómic') {
-        return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30"><i data-lucide="zap" class="w-3 h-3"></i> Cómic</span>`;
-      }
-      if (type === 'Manga') {
-        return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-pink-500/15 text-pink-300 border border-pink-500/30"><i data-lucide="sparkles" class="w-3 h-3"></i> Manga</span>`;
-      }
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"><i data-lucide="book" class="w-3 h-3"></i> Libro</span>`;
+    function getFilteredBooks() {
+      const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+
+      return books.filter(book => {
+        const isCompleted = book.current >= book.total;
+        if (currentFilter === 'Libro' && book.type !== 'Libro') return false;
+        if (currentFilter === 'Cómic' && book.type !== 'Cómic') return false;
+        if (currentFilter === 'Manga' && book.type !== 'Manga') return false;
+        if (currentFilter === 'in_progress' && (isCompleted || book.current === 0)) return false;
+        if (currentFilter === 'completed' && !isCompleted) return false;
+
+        if (q) {
+          const hay = `${book.title} ${book.author || ''} ${book.sagaName || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
     }
 
-    function getPlaceholderCoverHTML(type) {
-      let icon = 'book-open';
-      let gradient = 'from-indigo-950 via-slate-900 to-slate-950 text-indigo-400';
-      if (type === 'Cómic') {
-        icon = 'zap';
-        gradient = 'from-amber-950 via-slate-900 to-slate-950 text-amber-400';
-      } else if (type === 'Manga') {
-        icon = 'sparkles';
-        gradient = 'from-pink-950 via-slate-900 to-slate-950 text-pink-400';
+    function renderLibrary() {
+      updateStats();
+      const container = document.getElementById('libraryContainer');
+      const filtered = getFilteredBooks();
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 sm:p-12 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </div>
+            <h3 class="text-base font-bold text-white">No hay lecturas que coincidan</h3>
+            <p class="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">Prueba cambiando los filtros o agrega una nueva lectura a tu biblioteca.</p>
+          </div>
+        `;
+        return;
       }
+
+      if (viewMode === 'individual') {
+        container.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
+            ${filtered.map(book => renderBookCard(book)).join('')}
+          </div>
+        `;
+        return;
+      }
+
+      // MODO AGRUPADO POR SAGAS
+      const sagaMap = new Map();
+      const standalones = [];
+
+      filtered.forEach(book => {
+        const normKey = book.isSaga ? normalizeSagaKey(book.sagaName) : '';
+        if (normKey) {
+          if (!sagaMap.has(normKey)) {
+            sagaMap.set(normKey, {
+              key: normKey,
+              displayName: book.sagaName.trim(),
+              volumes: []
+            });
+          }
+          sagaMap.get(normKey).volumes.push(book);
+        } else {
+          standalones.push(book);
+        }
+      });
+
+      let html = '';
+
+      // Sección de Sagas / Series Agrupadas
+      if (sagaMap.size > 0) {
+        html += `<div class="space-y-4">`;
+        sagaMap.forEach(saga => {
+          html += renderSagaGroupCard(saga);
+        });
+        html += `</div>`;
+      }
+
+      // Sección de Lecturas Independientes
+      if (standalones.length > 0) {
+        html += `
+          <div class="space-y-3">
+            ${sagaMap.size > 0 ? `<h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Lecturas Independientes (${standalones.length})</h2>` : ''}
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
+              ${standalones.map(book => renderBookCard(book)).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderSagaGroupCard(saga) {
+      // Ordenar estrictamente por sagaOrder ascendente
+      const volumes = [...saga.volumes].sort((a, b) => (a.sagaOrder || 1) - (b.sagaOrder || 1));
+      const totalVols = volumes.length;
+      const completedVols = volumes.filter(v => v.current >= v.total).length;
+
+      // Progreso global basado en la suma de páginas/capítulos de toda la saga
+      const totalUnits = volumes.reduce((acc, v) => acc + (v.total || 0), 0);
+      const currentUnits = volumes.reduce((acc, v) => acc + Math.min(v.current || 0, v.total || 0), 0);
+      const sagaPercent = getProgressPercentage(currentUnits, totalUnits);
+      const barColor = getProgressHslColor(sagaPercent);
+
+      // Siguiente volumen pendiente (menor sagaOrder sin terminar)
+      const nextUnread = volumes.find(v => v.current < v.total) || null;
+      const isExpanded = expandedSagas.has(saga.key);
+
+      // Tipos únicos dentro de la saga
+      const uniqueTypes = [...new Set(volumes.map(v => v.type))];
+      const authors = [...new Set(volumes.map(v => v.author).filter(Boolean))];
+
       return `
-        <div class="w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-2 text-center select-none">
-          <i data-lucide="${icon}" class="w-8 h-8 mb-1.5 opacity-80"></i>
-          <span class="text-[10px] font-semibold uppercase tracking-wider opacity-60">${type}</span>
+        <div class="bg-slate-900/90 border ${isExpanded ? 'border-indigo-500/40' : 'border-slate-800/90'} rounded-2xl overflow-hidden shadow-lg transition animate-card">
+          <!-- Cabecera Clickable de la Saga -->
+          <div
+            onclick="toggleSagaExpand('${escapeHtml(saga.key)}')"
+            role="button"
+            tabindex="0"
+            class="p-4 sm:p-5 cursor-pointer hover:bg-slate-800/40 transition select-none"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1 space-y-1.5">
+                <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold">
+                    📚 SAGA
+                  </span>
+                  ${uniqueTypes.map(t => getTypeBadgeHtml(t)).join('')}
+                  <span class="text-xs font-semibold text-slate-300 bg-slate-800/90 px-2.5 py-0.5 rounded-full">
+                    ${completedVols} / ${totalVols} tomos completados
+                  </span>
+                </div>
+
+                <h3 class="text-base sm:text-lg font-extrabold text-white leading-snug break-words">
+                  ${escapeHtml(saga.displayName)}
+                </h3>
+
+                ${authors.length > 0 ? `<p class="text-xs text-slate-400 truncate">${escapeHtml(authors.join(', '))}</p>` : ''}
+              </div>
+
+              <!-- Porcentaje y Chevron -->
+              <div class="flex items-center gap-2.5 shrink-0">
+                <div class="text-right">
+                  <span class="text-sm sm:text-base font-extrabold text-white">${sagaPercent}%</span>
+                  <p class="text-[10px] text-slate-400 hidden sm:block">${currentUnits}/${totalUnits}</p>
+                </div>
+                <div class="w-9 h-9 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-slate-300">
+                  <svg class="w-5 h-5 saga-chevron ${isExpanded ? 'rotated' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Barra de Progreso Global de la Saga -->
+            <div class="mt-3.5 space-y-2">
+              <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+                <div class="h-full progress-bar-fill rounded-full" style="width: ${sagaPercent}%; background-color: ${barColor};"></div>
+              </div>
+
+              <!-- Badge del Siguiente Tomo Pendiente en Orden -->
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                ${nextUnread ? `
+                  <div class="inline-flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-lg max-w-full">
+                    <span class="font-bold shrink-0">▶ Siguiente (#${nextUnread.sagaOrder || 1}):</span>
+                    <span class="truncate font-medium">${escapeHtml(nextUnread.title)}</span>
+                  </div>
+                ` : `
+                  <div class="inline-flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg">
+                    <span class="font-bold">✨ ¡Saga completada al 100%!</span>
+                  </div>
+                `}
+
+                <span class="text-[11px] font-medium text-indigo-400">
+                  ${isExpanded ? 'Ocultar tomos' : `Ver ${totalVols} ${totalVols === 1 ? 'tomo' : 'tomos'}`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista Desplegable de Tomos Ordenados -->
+          ${isExpanded ? `
+            <div class="p-3.5 sm:p-5 pt-2 sm:pt-3 bg-slate-950/60 border-t border-slate-800/80">
+              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                ${volumes.map(vol => {
+                  const isNextActive = nextUnread && vol.id === nextUnread.id;
+                  const isFutureQueued = nextUnread && vol.current < vol.total && vol.id !== nextUnread.id;
+                  return renderBookCard(vol, { isInsideSaga: true, isNextActive, isFutureQueued });
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
     }
 
-    window.renderLibrary = function () {
-      updateStats();
-      const grid = document.getElementById('library-grid');
-      const emptyState = document.getElementById('empty-state');
-      const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
+    function renderBookCard(book, options = {}) {
+      const { isInsideSaga = false, isNextActive = false, isFutureQueued = false } = options;
+      const percent = getProgressPercentage(book.current, book.total);
+      const isCompleted = book.current >= book.total;
+      const barColor = getProgressHslColor(percent);
+      const unitShort = getUnitLabel(book.type, false);
+      const unitPlural = getUnitLabel(book.type, true);
 
-      const filtered = library.filter(item => {
-        const { percent, isCompleted } = calculateProgress(item);
-
-        if (currentStatusFilter === 'active' && (isCompleted || percent === 0)) return false;
-        if (currentStatusFilter === 'pending' && (isCompleted || percent > 0)) return false;
-        if (currentStatusFilter === 'completed' && !isCompleted) return false;
-        if (currentTypeFilter !== 'all' && item.type !== currentTypeFilter) return false;
-
-        if (query) {
-          const matchTitle = item.title.toLowerCase().includes(query);
-          const matchSaga = item.isSaga && item.sagaName && item.sagaName.toLowerCase().includes(query);
-          if (!matchTitle && !matchSaga) return false;
-        }
-        return true;
-      });
-
-      filtered.sort((a, b) => {
-        const compA = calculateProgress(a).isCompleted ? 1 : 0;
-        const compB = calculateProgress(b).isCompleted ? 1 : 0;
-        if (compA !== compB) return compA - compB;
-
-        if (a.isSaga && b.isSaga && normalizeSagaName(a.sagaName) === normalizeSagaName(b.sagaName)) {
-          return (Number(a.sagaOrder) || 1) - (Number(b.sagaOrder) || 1);
-        }
-        return (b.updatedAt || 0) - (a.updatedAt || 0);
-      });
-
-      if (filtered.length === 0) {
-        grid.innerHTML = '';
-        emptyState.classList.remove('hidden');
-        lucide.createIcons();
-        return;
+      // Borde destacado para el tomo activo dentro de una saga
+      let cardBorderClass = 'border-slate-800/90';
+      if (isNextActive) {
+        cardBorderClass = 'border-amber-500/60 ring-1 ring-amber-500/25';
+      } else if (isCompleted) {
+        cardBorderClass = 'border-emerald-500/30';
       }
 
-      emptyState.classList.add('hidden');
-      grid.innerHTML = filtered.map(item => createBookCardHTML(item)).join('');
-      lucide.createIcons();
-    };
-
-    function createBookCardHTML(item) {
-      const { percent, isCompleted } = calculateProgress(item);
-      const barColor = getProgressColorHSL(percent);
-      const lockInfo = getSagaLockInfo(item);
-
-      const pTotal = Number(item.pagesTotal) || 0;
-      const pRead = Number(item.pagesRead) || 0;
-      const cTotal = Number(item.chaptersTotal) || 0;
-      const cRead = Number(item.chaptersRead) || 0;
-
-      const coverHTML = item.cover
-        ? `<img src="${escapeHTML(item.cover)}" alt="${escapeHTML(item.title)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" class="w-full h-full object-cover" />
-           <div style="display:none;" class="w-full h-full">${getPlaceholderCoverHTML(item.type)}</div>`
-        : getPlaceholderCoverHTML(item.type);
-
-      const sagaBadgeHTML = (item.isSaga && item.sagaName)
-        ? `<div class="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-300 font-medium">
-             <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
-             <span class="truncate">${escapeHTML(item.sagaName)}</span>
-             <span class="px-1.5 py-0.2 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-[11px] font-bold text-indigo-200 shrink-0">#${item.sagaOrder || 1}</span>
-           </div>`
-        : `<div class="mt-1.5 text-xs text-slate-500 flex items-center gap-1">
-             <i data-lucide="file" class="w-3 h-3"></i>
-             <span>Lectura independiente</span>
-           </div>`;
-
-      let statusPill = '';
-      if (isCompleted) {
-        statusPill = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Completado</span>`;
-      } else if (lockInfo.isLocked) {
-        statusPill = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700" title="Debes terminar primero la entrega #${lockInfo.blockedByOrder}"><i data-lucide="lock" class="w-3 h-3 text-amber-400"></i> Espera #${lockInfo.blockedByOrder}</span>`;
-      }
+      const fallbackCover = `https://placehold.co/136x200/1e293b/94a3b8?text=${encodeURIComponent(book.type)}`;
+      const coverUrl = book.cover && book.cover.trim() ? book.cover.trim() : fallbackCover;
 
       return `
-        <article class="bg-slate-900/90 hover:bg-slate-900 border ${isCompleted ? 'border-emerald-500/30' : 'border-slate-800/90 hover:border-slate-700'} rounded-2xl p-4 flex flex-col justify-between gap-4 shadow-lg transition-all duration-200 group">
-          <!-- Parte Superior: Miniatura + Info -->
-          <div class="flex gap-4">
-            <div class="w-24 h-36 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0 shadow-md relative">
-              ${coverHTML}
-              ${isCompleted ? '<div class="absolute inset-0 bg-emerald-950/35 flex items-center justify-center"><div class="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg"><i data-lucide="check" class="w-5 h-5 stroke-[3]"></i></div></div>' : ''}
+        <article class="bg-slate-900 border ${cardBorderClass} rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3.5 shadow-md hover:border-slate-700 transition animate-card">
+          <!-- Parte Superior: Miniatura Responsiva + Metadatos -->
+          <div class="flex gap-3 sm:gap-3.5">
+            <!-- Miniatura Compacta (68x100 en móvil) -->
+            <div class="relative w-[68px] h-[100px] sm:w-[76px] sm:h-[112px] rounded-xl overflow-hidden bg-slate-800 border border-slate-700/70 shrink-0">
+              <img
+                src="${escapeHtml(coverUrl)}"
+                alt="${escapeHtml(book.title)}"
+                onerror="this.onerror=null;this.src='${fallbackCover}';"
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+              ${book.isSaga ? `
+                <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-slate-950/85 backdrop-blur text-[10px] font-extrabold text-indigo-300 border border-indigo-500/30">
+                  #${book.sagaOrder || 1}
+                </span>
+              ` : ''}
             </div>
 
-            <div class="flex-1 min-w-0 flex flex-col justify-between">
-              <div>
-                <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                  ${getTypeBadgeHTML(item.type)}
-                  ${statusPill}
+            <!-- Información Principal -->
+            <div class="min-w-0 flex-1 flex flex-col justify-between">
+              <div class="space-y-1">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  ${getTypeBadgeHtml(book.type)}
+                  ${isNextActive ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">▶ En turno</span>` : ''}
+                  ${isFutureQueued ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium">Siguiente en la cola</span>` : ''}
                 </div>
 
-                <h3 class="text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-indigo-300 transition" title="${escapeHTML(item.title)}">
-                  ${escapeHTML(item.title)}
-                </h3>
+                <h4 class="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 break-words">
+                  ${escapeHtml(book.title)}
+                </h4>
 
-                ${sagaBadgeHTML}
+                ${book.author ? `<p class="text-xs text-slate-400 truncate">${escapeHtml(book.author)}</p>` : ''}
+
+                ${!isInsideSaga && book.isSaga && book.sagaName ? `
+                  <p class="text-[11px] font-semibold text-indigo-400 truncate">
+                    📚 ${escapeHtml(book.sagaName)} • Tomo #${book.sagaOrder || 1}
+                  </p>
+                ` : ''}
               </div>
 
-              <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div class="bg-slate-950/90 border border-slate-800/80 rounded-xl px-2.5 py-1.5">
-                  <span class="text-slate-400 block text-[10px] uppercase tracking-wider">Páginas</span>
-                  <span class="font-bold text-slate-200">${pRead} <span class="text-slate-500 font-normal">/ ${pTotal > 0 ? pTotal : '—'}</span></span>
-                </div>
-                <div class="bg-slate-950/90 border border-slate-800/80 rounded-xl px-2.5 py-1.5">
-                  <span class="text-slate-400 block text-[10px] uppercase tracking-wider">Capítulos</span>
-                  <span class="font-bold text-slate-200">${cRead} <span class="text-slate-500 font-normal">/ ${cTotal > 0 ? cTotal : '—'}</span></span>
-                </div>
+              <!-- Texto de Progreso -->
+              <div class="flex items-center justify-between text-xs pt-1.5">
+                <span class="font-semibold text-slate-300">
+                  ${book.current} / ${book.total} ${unitPlural}
+                </span>
+                <span class="font-extrabold" style="color: ${barColor};">${percent}%</span>
               </div>
             </div>
           </div>
 
-          <!-- Parte Media: Barra de Progreso Dinámica -->
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400 font-medium">Progreso de lectura</span>
-              <span class="font-extrabold" style="color: ${barColor};">${percent}%</span>
-            </div>
-            <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80 p-0.5">
-              <div class="h-full rounded-full progress-bar-fill" style="width: ${percent}%; background-color: ${barColor};"></div>
-            </div>
+          <!-- Barra de Progreso Ancho Completo -->
+          <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+            <div class="h-full progress-bar-fill rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
           </div>
 
-          <!-- Parte Inferior: Controles Rápidos -->
-          <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5">
-              <button onclick="incrementProgress('${item.id}', 'pages')" ${isCompleted && pTotal > 0 && pRead >= pTotal ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-sky-600/20 hover:text-sky-300 hover:border-sky-500/40 border border-slate-700/80 text-xs font-semibold text-slate-300 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer" title="Sumar 1 página leída">
-                +1 Pág
-              </button>
-              <button onclick="incrementProgress('${item.id}', 'chapters')" ${isCompleted && cTotal > 0 && cRead >= cTotal ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-300 hover:border-emerald-500/40 border border-slate-700/80 text-xs font-semibold text-slate-300 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer" title="Sumar 1 capítulo leído">
-                +1 Cap
-              </button>
-            </div>
+          <!-- Botones de Acción Táctiles (min-height 40px+) -->
+          <div class="flex items-center justify-between gap-2 pt-0.5">
+            <button
+              onclick="incrementProgress('${book.id}', 1)"
+              ${isCompleted ? 'disabled' : ''}
+              class="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 min-h-[42px] rounded-xl text-xs font-bold transition ${
+                isCompleted
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white shadow-sm'
+              }"
+            >
+              ${isCompleted ? '✅ Completado' : `+1 ${unitShort}`}
+            </button>
 
-            <div class="flex items-center gap-1">
-              <button onclick="openFormModal('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Editar lectura">
-                <i data-lucide="pencil" class="w-4 h-4"></i>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                onclick="openBookModal('${book.id}')"
+                title="Editar"
+                aria-label="Editar lectura"
+                class="w-10 h-[42px] rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center transition"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
               </button>
-              <button onclick="askDeleteEntry('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer" title="Eliminar lectura">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
+
+              <button
+                onclick="openDeleteModal('${book.id}')"
+                title="Eliminar"
+                aria-label="Eliminar lectura"
+                class="w-10 h-[42px] rounded-xl bg-slate-800 hover:bg-rose-950/70 border border-slate-700/80 hover:border-rose-800/70 text-slate-400 hover:text-rose-300 flex items-center justify-center transition"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
               </button>
             </div>
           </div>
@@ -1529,681 +1133,247 @@
     }
 
     // =========================================================================
-    // 5. ACCIONES RÁPIDAS EN TARJETAS (+1 PÁGINA / +1 CAPÍTULO)
+    // ACCIONES CRUD Y PROGRESO
     // =========================================================================
-    window.incrementProgress = async function (id, field) {
-      const idx = library.findIndex(b => b.id === id);
+    async function incrementProgress(id, step) {
+      const idx = books.findIndex(b => b.id === id);
       if (idx === -1) return;
 
-      const item = { ...library[idx] };
-      const wasCompleted = calculateProgress(item).isCompleted;
+      const book = books[idx];
+      if (book.current >= book.total) return;
 
-      if (field === 'pages') {
-        const pTotal = Number(item.pagesTotal) || 0;
-        const nextVal = (Number(item.pagesRead) || 0) + 1;
-        item.pagesRead = pTotal > 0 ? Math.min(pTotal, nextVal) : nextVal;
-      } else if (field === 'chapters') {
-        const cTotal = Number(item.chaptersTotal) || 0;
-        const nextVal = (Number(item.chaptersRead) || 0) + 1;
-        item.chaptersRead = cTotal > 0 ? Math.min(cTotal, nextVal) : nextVal;
+      book.current = Math.min(book.total, book.current + step);
+      saveLocalData();
+      renderLibrary();
+
+      if (book.current === book.total) {
+        showToast(`🎉 ¡Completaste "${book.title}"!`, 'success');
       }
 
-      item.updatedAt = Date.now();
-      await persistBookEntry(item);
-
-      const nowCompleted = calculateProgress(item).isCompleted;
-      if (!wasCompleted && nowCompleted) {
-        showToast(`🎉 ¡Completaste "${item.title}"!`, 'success');
+      if (accessToken) {
+        await pushAllToSheets();
       }
-    };
-
-    // =========================================================================
-    // 6. FORMULARIO DE REGISTRO / EDICIÓN Y COMPRESIÓN DE MINIATURAS (< 100KB)
-    // =========================================================================
-    function populateSagasDatalist() {
-      const datalist = document.getElementById('existing-sagas-list');
-      const uniqueSagas = new Map();
-      for (const item of library) {
-        if (item.isSaga && item.sagaName && item.sagaName.trim()) {
-          const norm = normalizeSagaName(item.sagaName);
-          if (!uniqueSagas.has(norm)) {
-            uniqueSagas.set(norm, item.sagaName.trim());
-          }
-        }
-      }
-      datalist.innerHTML = Array.from(uniqueSagas.values())
-        .map(name => `<option value="${escapeHTML(name)}"></option>`)
-        .join('');
     }
 
-    window.openFormModal = function (editId = null) {
-      populateSagasDatalist();
-      const modal = document.getElementById('form-modal');
-      const form = document.getElementById('book-form');
+    function openBookModal(editId = null) {
+      const modal = document.getElementById('bookModal');
+      const form = document.getElementById('bookForm');
       form.reset();
 
-      currentBase64Cover = '';
-      document.getElementById('entry-id').value = '';
-      document.getElementById('cover-url-input').value = '';
-      updateCoverPreviewUI('');
+      // Rellenar sugerencias de sagas existentes
+      const datalist = document.getElementById('existingSagasList');
+      const uniqueSagaNames = [...new Set(books.filter(b => b.isSaga && b.sagaName).map(b => b.sagaName.trim()))];
+      datalist.innerHTML = uniqueSagaNames.map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
 
       if (editId) {
-        const item = library.find(b => b.id === editId);
-        if (!item) return;
-
-        document.getElementById('form-modal-title').innerHTML = `<i data-lucide="pencil" class="w-5 h-5 text-indigo-400"></i><span>Editar Lectura</span>`;
-        document.getElementById('entry-id').value = item.id;
-        document.getElementById('title-input').value = item.title;
-
-        const typeRadio = document.querySelector(`input[name="work-type"][value="${item.type}"]`);
-        if (typeRadio) typeRadio.checked = true;
-
-        const isSagaCheck = document.getElementById('is-saga-checkbox');
-        isSagaCheck.checked = Boolean(item.isSaga);
-        toggleSagaFields();
-        if (item.isSaga) {
-          document.getElementById('saga-name-input').value = item.sagaName || '';
-          document.getElementById('saga-order-input').value = item.sagaOrder || 1;
-        }
-
-        document.getElementById('pages-read-input').value = item.pagesRead || 0;
-        document.getElementById('pages-total-input').value = item.pagesTotal || 0;
-        document.getElementById('chapters-read-input').value = item.chaptersRead || 0;
-        document.getElementById('chapters-total-input').value = item.chaptersTotal || 0;
-
-        if (item.cover) {
-          if (item.cover.startsWith('data:image')) {
-            currentBase64Cover = item.cover;
-            updateCoverPreviewUI(item.cover);
-          } else {
-            document.getElementById('cover-url-input').value = item.cover;
-            updateCoverPreviewUI(item.cover);
-          }
-        }
+        const book = books.find(b => b.id === editId);
+        if (!book) return;
+        document.getElementById('modalTitle').textContent = 'Editar Lectura';
+        document.getElementById('bookId').value = book.id;
+        document.getElementById('bookTitle').value = book.title;
+        document.getElementById('bookType').value = book.type;
+        document.getElementById('bookAuthor').value = book.author || '';
+        document.getElementById('bookCurrent').value = book.current;
+        document.getElementById('bookTotal').value = book.total;
+        document.getElementById('bookIsSaga').checked = Boolean(book.isSaga);
+        document.getElementById('bookSagaName').value = book.sagaName || '';
+        document.getElementById('bookSagaOrder').value = book.sagaOrder || 1;
+        document.getElementById('bookCover').value = book.cover || '';
       } else {
-        document.getElementById('form-modal-title').innerHTML = `<i data-lucide="book-plus" class="w-5 h-5 text-indigo-400"></i><span>Registrar Nueva Lectura</span>`;
-        document.getElementById('is-saga-checkbox').checked = false;
-        toggleSagaFields();
+        document.getElementById('modalTitle').textContent = 'Nueva Lectura';
+        document.getElementById('bookId').value = '';
+        document.getElementById('bookIsSaga').checked = false;
+        document.getElementById('bookSagaOrder').value = 1;
       }
 
-      updateFormLivePreview();
+      updateUnitLabels();
+      toggleSagaFields();
+
       modal.classList.remove('hidden');
-      lucide.createIcons();
-    };
+      modal.classList.add('flex');
+    }
 
-    window.closeFormModal = function () {
-      document.getElementById('form-modal').classList.add('hidden');
-    };
+    function closeBookModal() {
+      const modal = document.getElementById('bookModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
 
-    window.toggleSagaFields = function () {
-      const checked = document.getElementById('is-saga-checkbox').checked;
-      const container = document.getElementById('saga-fields-container');
-      const sagaNameInput = document.getElementById('saga-name-input');
-      const sagaOrderInput = document.getElementById('saga-order-input');
+    function updateUnitLabels() {
+      const type = document.getElementById('bookType').value;
+      const isManga = type === 'Manga';
+      document.getElementById('labelCurrentUnit').textContent = isManga ? 'Capítulos leídos' : 'Páginas leídas';
+      document.getElementById('labelTotalUnit').textContent = isManga ? 'Total de capítulos *' : 'Total de páginas *';
+    }
 
-      if (checked) {
+    function toggleSagaFields() {
+      const isSaga = document.getElementById('bookIsSaga').checked;
+      const container = document.getElementById('sagaFieldsContainer');
+      const sagaNameInput = document.getElementById('bookSagaName');
+
+      if (isSaga) {
         container.classList.remove('hidden');
         container.classList.add('grid');
         sagaNameInput.required = true;
-        sagaOrderInput.required = true;
       } else {
         container.classList.add('hidden');
         container.classList.remove('grid');
         sagaNameInput.required = false;
-        sagaOrderInput.required = false;
-      }
-    };
-
-    window.updateFormLivePreview = function () {
-      const tempItem = {
-        pagesRead: Number(document.getElementById('pages-read-input').value) || 0,
-        pagesTotal: Number(document.getElementById('pages-total-input').value) || 0,
-        chaptersRead: Number(document.getElementById('chapters-read-input').value) || 0,
-        chaptersTotal: Number(document.getElementById('chapters-total-input').value) || 0,
-      };
-      const { percent } = calculateProgress(tempItem);
-      const color = getProgressColorHSL(percent);
-
-      const badge = document.getElementById('form-live-percent');
-      const bar = document.getElementById('form-live-bar');
-
-      badge.textContent = `Progreso: ${percent}%`;
-      badge.style.color = color;
-      bar.style.width = `${percent}%`;
-      bar.style.backgroundColor = color;
-    };
-
-    /**
-     * Comprime y redimensiona la imagen en base64 garantizando un peso ligero (< 42 KB)
-     * para caber directamente dentro de una celda de Google Sheets (límite 50,000 caracteres)
-     * y sincronizarse entre todos los dispositivos del usuario.
-     */
-    window.handleImageUpload = function (event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (!file.type.startsWith('image/')) {
-        showToast('Por favor selecciona un archivo de imagen válido.', 'error');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const img = new Image();
-        img.onload = function () {
-          const canvas = document.getElementById('image-resizer-canvas');
-          const ctx = canvas.getContext('2d');
-
-          const MAX_W = 160;
-          const MAX_H = 240;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_W) {
-              height = Math.round((height * MAX_W) / width);
-              width = MAX_W;
-            }
-          } else {
-            if (height > MAX_H) {
-              width = Math.round((width * MAX_H) / height);
-              height = MAX_H;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Ajustar calidad progresivamente para asegurar < 42,000 caracteres (compatible con celdas de Google Sheets)
-          let quality = 0.72;
-          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-          while (compressedBase64.length > 42000 && quality > 0.25) {
-            quality -= 0.1;
-            compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-          }
-
-          currentBase64Cover = compressedBase64;
-          document.getElementById('cover-url-input').value = '';
-          updateCoverPreviewUI(compressedBase64);
-          showToast('Portada optimizada lista para guardar en Google Sheets.', 'success');
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    };
-
-    window.handleCoverUrlInput = function (url) {
-      const trimmed = url.trim();
-      if (trimmed) {
-        currentBase64Cover = '';
-        updateCoverPreviewUI(trimmed);
-      } else if (!currentBase64Cover) {
-        updateCoverPreviewUI('');
-      }
-    };
-
-    window.clearCoverImage = function () {
-      currentBase64Cover = '';
-      document.getElementById('cover-file-input').value = '';
-      document.getElementById('cover-url-input').value = '';
-      updateCoverPreviewUI('');
-    };
-
-    function updateCoverPreviewUI(src) {
-      const imgEl = document.getElementById('cover-preview-img');
-      const placeholderEl = document.getElementById('cover-preview-placeholder');
-      const clearBtn = document.getElementById('clear-cover-btn');
-
-      if (src) {
-        imgEl.src = src;
-        imgEl.classList.remove('hidden');
-        placeholderEl.classList.add('hidden');
-        clearBtn.classList.remove('hidden');
-      } else {
-        imgEl.src = '';
-        imgEl.classList.add('hidden');
-        placeholderEl.classList.remove('hidden');
-        clearBtn.classList.add('hidden');
       }
     }
 
-    window.updatePlaceholderIcon = function () {};
-
-    window.handleFormSubmit = async function (event) {
+    async function saveBook(event) {
       event.preventDefault();
 
-      const id = document.getElementById('entry-id').value;
-      const title = document.getElementById('title-input').value.trim();
-      const type = document.querySelector('input[name="work-type"]:checked').value;
-      const isSaga = document.getElementById('is-saga-checkbox').checked;
-      const sagaName = isSaga ? document.getElementById('saga-name-input').value.trim() : '';
-      const sagaOrder = isSaga ? Math.max(1, parseInt(document.getElementById('saga-order-input').value, 10) || 1) : 1;
+      const id = document.getElementById('bookId').value;
+      const title = document.getElementById('bookTitle').value.trim();
+      const type = document.getElementById('bookType').value;
+      const author = document.getElementById('bookAuthor').value.trim();
+      const total = Math.max(1, parseInt(document.getElementById('bookTotal').value, 10) || 1);
+      const current = Math.min(total, Math.max(0, parseInt(document.getElementById('bookCurrent').value, 10) || 0));
+      const isSaga = document.getElementById('bookIsSaga').checked;
+      const sagaName = isSaga ? document.getElementById('bookSagaName').value.trim() : '';
+      const sagaOrder = isSaga ? Math.max(1, parseInt(document.getElementById('bookSagaOrder').value, 10) || 1) : 1;
+      const cover = document.getElementById('bookCover').value.trim();
 
-      const pagesRead = Math.max(0, parseInt(document.getElementById('pages-read-input').value, 10) || 0);
-      const pagesTotal = Math.max(0, parseInt(document.getElementById('pages-total-input').value, 10) || 0);
-      const chaptersRead = Math.max(0, parseInt(document.getElementById('chapters-read-input').value, 10) || 0);
-      const chaptersTotal = Math.max(0, parseInt(document.getElementById('chapters-total-input').value, 10) || 0);
-
-      const urlCover = document.getElementById('cover-url-input').value.trim();
-      const finalCover = currentBase64Cover || urlCover || '';
-
-      if (!title) {
-        showToast('Por favor escribe el nombre del título.', 'error');
-        return;
-      }
-
-      if (isSaga && !sagaName) {
-        showToast('Por favor indica el nombre de la saga.', 'error');
-        return;
-      }
+      const payload = {
+        id: id || crypto.randomUUID(),
+        title,
+        type,
+        author,
+        current,
+        total,
+        isSaga: isSaga && Boolean(sagaName),
+        sagaName,
+        sagaOrder,
+        cover
+      };
 
       if (id) {
-        const existing = library.find(b => b.id === id);
-        const updatedEntry = {
-          ...(existing || {}),
-          id,
-          title,
-          type,
-          isSaga,
-          sagaName,
-          sagaOrder,
-          pagesRead,
-          pagesTotal,
-          chaptersRead,
-          chaptersTotal,
-          cover: finalCover,
-          updatedAt: Date.now()
-        };
-        await persistBookEntry(updatedEntry);
-        showToast('Lectura actualizada correctamente.', 'success');
+        const idx = books.findIndex(b => b.id === id);
+        if (idx !== -1) books[idx] = payload;
       } else {
-        const newEntry = {
-          id: 'book_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-          title,
-          type,
-          isSaga,
-          sagaName,
-          sagaOrder,
-          pagesRead,
-          pagesTotal,
-          chaptersRead,
-          chaptersTotal,
-          cover: finalCover,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        };
-        await persistBookEntry(newEntry);
-        showToast('¡Lectura agregada a tu biblioteca!', 'success');
+        books.unshift(payload);
       }
 
-      closeFormModal();
-    };
+      if (payload.isSaga && payload.sagaName) {
+        expandedSagas.add(normalizeSagaKey(payload.sagaName));
+      }
 
-    // =========================================================================
-    // 7. MODAL "LECTURA DEL DÍA" CON ANIMACIÓN DE RULETA Y LÓGICA DE SAGAS
-    // =========================================================================
-    window.openDailyPickModal = function () {
-      const modal = document.getElementById('daily-modal');
+      saveLocalData();
+      closeBookModal();
+      renderLibrary();
+      showToast(id ? 'Lectura actualizada' : 'Lectura agregada a tu biblioteca', 'success');
+
+      if (accessToken) {
+        await pushAllToSheets();
+      }
+    }
+
+    function openDeleteModal(id) {
+      const book = books.find(b => b.id === id);
+      if (!book) return;
+      bookIdToDelete = id;
+      document.getElementById('deleteModalText').textContent = `Se eliminará "${book.title}" de tu lista de lecturas.`;
+      const modal = document.getElementById('deleteModal');
       modal.classList.remove('hidden');
-      spinDailyRoulette();
-    };
+      modal.classList.add('flex');
 
-    window.closeDailyModal = function () {
-      document.getElementById('daily-modal').classList.add('hidden');
-    };
-
-    window.spinDailyRoulette = function () {
-      const body = document.getElementById('daily-modal-body');
-      const eligible = getEligibleDailyBooks();
-
-      if (eligible.length === 0) {
-        body.innerHTML = `
-          <div class="py-6 space-y-4">
-            <div class="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
-              <i data-lucide="party-popper" class="w-8 h-8 text-emerald-400"></i>
-            </div>
-            <h3 class="text-lg font-bold text-white">¡No hay lecturas pendientes!</h3>
-            <p class="text-sm text-slate-400">
-              Ya terminaste todos los títulos registrados o aún no has agregado ninguno. ¡Registra una nueva lectura para sortear!
-            </p>
-            <button onclick="closeDailyModal(); openFormModal();" class="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition cursor-pointer">
-              <i data-lucide="plus" class="w-4 h-4"></i> Registrar nueva lectura
-            </button>
-          </div>
-        `;
-        lucide.createIcons();
-        return;
-      }
-
-      let pool = eligible;
-      if (eligible.length > 1 && lastPickedId) {
-        pool = eligible.filter(b => b.id !== lastPickedId);
-      }
-      const winner = pool[Math.floor(Math.random() * pool.length)];
-      lastPickedId = winner.id;
-
-      let ticks = 0;
-      const maxTicks = 12;
-      body.innerHTML = `
-        <div class="py-8 space-y-4">
-          <div class="w-16 h-16 rounded-full bg-indigo-500/20 border-2 border-indigo-500 flex items-center justify-center mx-auto animate-spin">
-            <i data-lucide="loader-2" class="w-8 h-8 text-indigo-400"></i>
-          </div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-indigo-400">Analizando sagas y pendientes...</p>
-          <p id="roulette-ticker" class="text-lg font-extrabold text-white truncate px-4">${escapeHTML(eligible[0].title)}</p>
-        </div>
-      `;
-      lucide.createIcons();
-
-      const interval = setInterval(() => {
-        ticks++;
-        const randomPreview = eligible[ticks % eligible.length];
-        const tickerEl = document.getElementById('roulette-ticker');
-        if (tickerEl) tickerEl.textContent = randomPreview.title;
-
-        if (ticks >= maxTicks) {
-          clearInterval(interval);
-          renderDailyWinner(winner, eligible.length);
+      document.getElementById('confirmDeleteBtn').onclick = async () => {
+        books = books.filter(b => b.id !== bookIdToDelete);
+        saveLocalData();
+        closeDeleteModal();
+        renderLibrary();
+        showToast('Lectura eliminada', 'info');
+        if (accessToken) {
+          await pushAllToSheets();
         }
-      }, 75);
-    };
+      };
+    }
 
-    function renderDailyWinner(winner, totalEligible) {
-      const body = document.getElementById('daily-modal-body');
-      const { percent } = calculateProgress(winner);
-      const barColor = getProgressColorHSL(percent);
-
-      const coverHTML = winner.cover
-        ? `<img src="${escapeHTML(winner.cover)}" alt="${escapeHTML(winner.title)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" class="w-full h-full object-cover" />
-           <div style="display:none;" class="w-full h-full">${getPlaceholderCoverHTML(winner.type)}</div>`
-        : getPlaceholderCoverHTML(winner.type);
-
-      const sagaInfoHTML = (winner.isSaga && winner.sagaName)
-        ? `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-xs font-semibold text-indigo-300 mt-2">
-             <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-             <span>${escapeHTML(winner.sagaName)} — Entrega #${winner.sagaOrder}</span>
-           </div>`
-        : `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-xs font-medium text-slate-400 mt-2">
-             <span>Título independiente</span>
-           </div>`;
-
-      body.innerHTML = `
-        <div class="animate-pop-in space-y-5">
-          <div class="text-xs font-bold uppercase tracking-widest text-emerald-400">✨ Tu lectura recomendada de hoy ✨</div>
-
-          <div class="w-32 h-48 mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 border-indigo-500/50 shadow-2xl shadow-indigo-500/20">
-            ${coverHTML}
-          </div>
-
-          <div>
-            <div class="mb-1.5">${getTypeBadgeHTML(winner.type)}</div>
-            <h3 class="text-xl font-extrabold text-white leading-snug">${escapeHTML(winner.title)}</h3>
-            ${sagaInfoHTML}
-          </div>
-
-          <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 text-left space-y-2">
-            <div class="flex justify-between text-xs">
-              <span class="text-slate-400">Avance actual</span>
-              <span class="font-extrabold" style="color: ${barColor};">${percent}%</span>
-            </div>
-            <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden">
-              <div class="h-full rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
-            </div>
-            <div class="flex justify-between text-[11px] text-slate-400 pt-1">
-              <span>Páginas: <strong class="text-slate-200">${winner.pagesRead || 0}/${winner.pagesTotal || '—'}</strong></span>
-              <span>Capítulos: <strong class="text-slate-200">${winner.chaptersRead || 0}/${winner.chaptersTotal || '—'}</strong></span>
-            </div>
-          </div>
-
-          <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
-            ${totalEligible > 1 ? `
-              <button onclick="spinDailyRoulette()" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition cursor-pointer">
-                <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-400"></i> Volver a sortear (${totalEligible} opciones)
-              </button>
-            ` : ''}
-            <button onclick="closeDailyModal(); openFormModal('${winner.id}');" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition cursor-pointer">
-              <i data-lucide="book-open" class="w-4 h-4"></i> Actualizar progreso
-            </button>
-          </div>
-        </div>
-      `;
-      lucide.createIcons();
+    function closeDeleteModal() {
+      const modal = document.getElementById('deleteModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      bookIdToDelete = null;
     }
 
     // =========================================================================
-    // 8. ELIMINACIÓN, RESPALDO JSON Y DATOS DE EJEMPLO
+    // LECTURA DEL DÍA (SOLO INDEPENDIENTES PENDIENTES O PRIMER TOMO PENDIENTE DE SAGA)
     // =========================================================================
-    window.askDeleteEntry = function (id) {
-      const item = library.find(b => b.id === id);
-      if (!item) return;
+    function pickDailyRead() {
+      const candidates = [];
+      const sagaFirstUnreadMap = new Map();
 
-      document.getElementById('confirm-title').textContent = 'Eliminar lectura';
-      document.getElementById('confirm-message').textContent = `¿Deseas eliminar "${item.title}" de tu registro? Esta acción no se puede deshacer.`;
+      books.forEach(book => {
+        if (book.current >= book.total) return; // Ignorar completados
 
-      const confirmBtn = document.getElementById('confirm-action-btn');
-      confirmBtn.onclick = async () => {
-        await removeBookEntry(id);
-        closeConfirmModal();
-        showToast('Lectura eliminada.', 'info');
-      };
-
-      document.getElementById('confirm-modal').classList.remove('hidden');
-    };
-
-    window.askClearAllData = function () {
-      document.getElementById('confirm-title').textContent = 'Borrar toda la biblioteca';
-      document.getElementById('confirm-message').textContent = 'Se eliminarán permanentemente todos tus libros, cómics y mangas registrados.';
-
-      const confirmBtn = document.getElementById('confirm-action-btn');
-      confirmBtn.onclick = async () => {
-        await replaceAllBooks([]);
-        closeConfirmModal();
-        showToast('Biblioteca vaciada por completo.', 'info');
-      };
-
-      document.getElementById('confirm-modal').classList.remove('hidden');
-    };
-
-    window.closeConfirmModal = function () {
-      document.getElementById('confirm-modal').classList.add('hidden');
-    };
-
-    window.openSetupHelpModal = function () {
-      document.getElementById('setup-help-modal').classList.remove('hidden');
-      lucide.createIcons();
-    };
-
-    window.closeSetupHelpModal = function () {
-      document.getElementById('setup-help-modal').classList.add('hidden');
-    };
-
-    window.toggleBackupMenu = function () {
-      document.getElementById('backup-menu').classList.toggle('hidden');
-    };
-
-    window.exportJSON = function () {
-      const dataStr = JSON.stringify(library, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const dateStr = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `bibliotrack_respaldo_${dateStr}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Respaldo JSON descargado.', 'success');
-    };
-
-    window.importJSON = function (event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const imported = JSON.parse(e.target.result);
-          if (!Array.isArray(imported)) {
-            throw new Error('Formato inválido');
+        const normKey = book.isSaga ? normalizeSagaKey(book.sagaName) : '';
+        if (normKey) {
+          const existing = sagaFirstUnreadMap.get(normKey);
+          if (!existing || (book.sagaOrder || 1) < (existing.sagaOrder || 1)) {
+            sagaFirstUnreadMap.set(normKey, book);
           }
-          await replaceAllBooks(imported);
-          showToast(`Se importaron ${imported.length} lecturas correctamente.`, 'success');
-        } catch (err) {
-          showToast('El archivo JSON no tiene un formato válido.', 'error');
+        } else {
+          candidates.push(book);
         }
-        event.target.value = '';
-      };
-      reader.readAsText(file);
-    };
+      });
 
-    window.loadDemoData = async function () {
-      const now = Date.now();
-      const demoEntries = [
-        {
-          id: 'demo_1',
-          title: 'El Imperio Final',
-          type: 'Libro',
-          isSaga: true,
-          sagaName: 'Nacidos de la Bruma',
-          sagaOrder: 1,
-          pagesRead: 688,
-          pagesTotal: 688,
-          chaptersRead: 38,
-          chaptersTotal: 38,
-          cover: '',
-          createdAt: now - 5000,
-          updatedAt: now - 5000
-        },
-        {
-          id: 'demo_2',
-          title: 'El Pozo de la Ascensión',
-          type: 'Libro',
-          isSaga: true,
-          sagaName: 'Nacidos de la Bruma',
-          sagaOrder: 2,
-          pagesRead: 320,
-          pagesTotal: 800,
-          chaptersRead: 24,
-          chaptersTotal: 59,
-          cover: '',
-          createdAt: now - 4000,
-          updatedAt: now - 4000
-        },
-        {
-          id: 'demo_3',
-          title: 'El Héroe de las Eras',
-          type: 'Libro',
-          isSaga: true,
-          sagaName: 'Nacidos de la Bruma',
-          sagaOrder: 3,
-          pagesRead: 0,
-          pagesTotal: 760,
-          chaptersRead: 0,
-          chaptersTotal: 82,
-          cover: '',
-          createdAt: now - 3000,
-          updatedAt: now - 3000
-        },
-        {
-          id: 'demo_4',
-          title: 'Chainsaw Man Vol. 1',
-          type: 'Manga',
-          isSaga: true,
-          sagaName: 'Chainsaw Man',
-          sagaOrder: 1,
-          pagesRead: 45,
-          pagesTotal: 192,
-          chaptersRead: 2,
-          chaptersTotal: 7,
-          cover: '',
-          createdAt: now - 2000,
-          updatedAt: now - 2000
-        },
-        {
-          id: 'demo_5',
-          title: 'Chainsaw Man Vol. 2',
-          type: 'Manga',
-          isSaga: true,
-          sagaName: 'Chainsaw Man',
-          sagaOrder: 2,
-          pagesRead: 0,
-          pagesTotal: 192,
-          chaptersRead: 0,
-          chaptersTotal: 9,
-          cover: '',
-          createdAt: now - 1500,
-          updatedAt: now - 1500
-        },
-        {
-          id: 'demo_6',
-          title: 'Watchmen (Edición Integral)',
-          type: 'Cómic',
-          isSaga: false,
-          sagaName: '',
-          sagaOrder: 1,
-          pagesRead: 210,
-          pagesTotal: 416,
-          chaptersRead: 6,
-          chaptersTotal: 12,
-          cover: '',
-          createdAt: now - 1000,
-          updatedAt: now - 1000
-        }
-      ];
+      sagaFirstUnreadMap.forEach(vol => candidates.push(vol));
 
-      const existingIds = new Set(library.map(b => b.id));
-      let added = 0;
-      for (const item of demoEntries) {
-        if (!existingIds.has(item.id)) {
-          await persistBookEntry(item);
-          added++;
-        }
+      if (candidates.length === 0) {
+        showToast('¡Felicidades! No tienes lecturas pendientes por ahora.', 'success');
+        return;
       }
 
-      if (added > 0) {
-        showToast('Se cargaron ejemplos con sagas para probar la ruleta.', 'success');
-      } else {
-        showToast('Los ejemplos ya están cargados en tu biblioteca.', 'info');
-      }
-    };
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      const percent = getProgressPercentage(chosen.current, chosen.total);
+      const unitPlural = getUnitLabel(chosen.type, true);
+
+      document.getElementById('dailyBookTitle').textContent = chosen.title;
+      document.getElementById('dailyBookSubtitle').textContent = chosen.isSaga && chosen.sagaName
+        ? `${chosen.sagaName} (Tomo #${chosen.sagaOrder || 1})${chosen.author ? ' • ' + chosen.author : ''}`
+        : `${chosen.type}${chosen.author ? ' • ' + chosen.author : ''}`;
+
+      document.getElementById('dailyBookProgressBox').innerHTML = `
+        Progreso actual: <strong class="text-white">${chosen.current} / ${chosen.total} ${unitPlural}</strong> (${percent}%)
+      `;
+
+      const modal = document.getElementById('dailyModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeDailyModal() {
+      const modal = document.getElementById('dailyModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
 
     // =========================================================================
-    // 9. UTILIDADES DE INTERFAZ (TOAST Y ESCAPE HTML)
+    // UTILIDADES UI (TOASTS Y ESCAPE HTML)
     // =========================================================================
     function showToast(message, type = 'info') {
-      const container = document.getElementById('toast-container');
+      const container = document.getElementById('toastContainer');
+      const colors = {
+        success: 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200',
+        error: 'bg-rose-950/95 border-rose-500/40 text-rose-200',
+        info: 'bg-slate-900/95 border-slate-700 text-slate-200'
+      };
       const toast = document.createElement('div');
-
-      let colors = 'bg-slate-800 border-slate-700 text-white';
-      let icon = 'info';
-      if (type === 'success') {
-        colors = 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200';
-        icon = 'check-circle-2';
-      } else if (type === 'error') {
-        colors = 'bg-rose-950/95 border-rose-500/40 text-rose-200';
-        icon = 'alert-circle';
-      }
-
-      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-xl text-sm font-medium animate-pop-in ${colors}`;
-      toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i><span>${escapeHTML(message)}</span>`;
-
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border text-xs sm:text-sm font-medium shadow-xl backdrop-blur-md transition-all duration-300 ${colors[type] || colors.info}`;
+      toast.textContent = message;
       container.appendChild(toast);
-      lucide.createIcons();
 
       setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(8px)';
-        toast.style.transition = 'all 0.25s ease';
-        setTimeout(() => toast.remove(), 260);
+        toast.style.transform = 'translateY(6px)';
+        setTimeout(() => toast.remove(), 300);
       }, 3200);
     }
 
-    function escapeHTML(str) {
-      if (!str) return '';
-      return String(str)
+    function escapeHtml(str) {
+      return String(str || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
