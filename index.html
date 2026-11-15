@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Identity Services (OAuth 2.0) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -109,6 +111,12 @@
 
       <!-- Acciones principales -->
       <div class="flex flex-wrap items-center justify-center md:justify-end gap-2.5 w-full md:w-auto">
+        <!-- Indicador de estado de sincronización -->
+        <div id="sync-status-badge" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-medium text-slate-400" title="Estado de almacenamiento">
+          <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="sync-status-text">Modo Local</span>
+        </div>
+
         <!-- Botón Lectura del Día -->
         <button onclick="openDailyPickModal()" class="btn-roulette inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 hover:from-indigo-500 hover:to-fuchsia-500 text-white text-sm font-bold transition transform active:scale-95 cursor-pointer">
           <span class="text-base">🎲</span>
@@ -120,6 +128,41 @@
           <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-400"></i>
           <span>Registrar Título</span>
         </button>
+
+        <!-- Panel de Autenticación y Google Sheets -->
+        <div id="auth-container" class="flex items-center gap-2">
+          <!-- Botón Conectar con Google Sheets (Visible cuando no hay sesión) -->
+          <div id="google-login-group" class="flex items-center gap-1.5">
+            <button id="google-login-btn" onclick="connectGoogleSheets()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-sm font-bold shadow-md transition cursor-pointer">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#0F9D58" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 15H9v-2h6v2zm0-4H9v-2h6v2zm-2-4V3.5L18.5 9H13z"/>
+              </svg>
+              <span>Conectar con Google Sheets</span>
+            </button>
+            <button id="setup-help-btn" onclick="openSetupHelpModal()" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 transition cursor-pointer" title="¿Cómo configurar mi Client ID de Google?">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Perfil del Usuario Autenticado + Acciones de Sheet (Oculto por defecto) -->
+          <div id="user-profile-box" class="hidden items-center gap-2 pl-2.5 pr-1.5 py-1 rounded-xl bg-slate-900 border border-slate-800">
+            <img id="user-avatar" src="" alt="Avatar" class="w-7 h-7 rounded-lg object-cover border border-emerald-500/40 shrink-0" />
+            <div class="flex flex-col text-left max-w-[135px]">
+              <span id="user-display-name" class="text-xs font-semibold text-slate-200 truncate leading-tight">Usuario</span>
+              <span id="user-display-email" class="text-[10px] text-slate-400 truncate leading-tight">correo@gmail.com</span>
+            </div>
+            <a id="open-sheet-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition" title="Abrir mi hoja BiblioTrack_Registros en Google Sheets">
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              <span>Ver mi Google Sheet</span>
+            </a>
+            <button onclick="manualSyncFromSheet()" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-sky-950/50 transition cursor-pointer" title="Sincronizar ahora con Google Sheets">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <button onclick="signOutGoogleSheets()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 transition cursor-pointer" title="Cerrar sesión">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
 
         <!-- Menú Respaldo / Ejemplos -->
         <div class="relative inline-block">
@@ -214,6 +257,7 @@
         <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800" role="group">
           <button onclick="setStatusFilter('all')" id="filter-status-all" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white">Todos</button>
           <button onclick="setStatusFilter('active')" id="filter-status-active" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">En progreso</button>
+          <button onclick="setStatusFilter('pending')" id="filter-status-pending" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Pendientes</button>
           <button onclick="setStatusFilter('completed')" id="filter-status-completed" class="filter-status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">Terminados</button>
         </div>
 
@@ -254,7 +298,7 @@
 
   <!-- Footer -->
   <footer class="border-t border-slate-800/70 py-5 mt-12 text-center text-xs text-slate-500">
-    <p>BiblioTrack — Tus lecturas se guardan automáticamente en tu navegador (localStorage).</p>
+    <p id="footer-storage-note">BiblioTrack — Conecta tu cuenta de Google para crear y sincronizar tu propio Google Sheet o usa el modo local automático.</p>
   </footer>
 
   <!-- ===================================================================== -->
@@ -475,29 +519,679 @@
     </div>
   </div>
 
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: AYUDA DE CONFIGURACIÓN DE GOOGLE CLIENT ID                   -->
+  <!-- ===================================================================== -->
+  <div id="setup-help-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden my-auto animate-pop-in">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="info" class="w-5 h-5 text-amber-400"></i>
+          <span>¿Cómo configurar mi Google Client ID?</span>
+        </h2>
+        <button onclick="closeSetupHelpModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4 text-sm text-slate-300 max-h-[80vh] overflow-y-auto">
+        <p class="text-slate-400">
+          Para que cada usuario pueda guardar sus registros en su propia hoja <strong>BiblioTrack_Registros</strong> de Google Sheets desde GitHub Pages, sigue estos pasos gratuitos una sola vez:
+        </p>
+        <ol class="list-decimal list-inside space-y-2.5 text-xs sm:text-sm text-slate-300 bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+          <li>Entra a <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-indigo-400 underline font-semibold">Google Cloud Console</a> y crea un proyecto nuevo.</li>
+          <li>Ve a <strong>APIs y servicios → Biblioteca</strong> y habilita <strong>Google Drive API</strong> y <strong>Google Sheets API</strong>.</li>
+          <li>Ve a <strong>Pantalla de consentimiento de OAuth</strong> (tipo <em>Externo</em>), pon el nombre de tu app, tu correo y añade el alcance <code class="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300">.../auth/drive.file</code> (y añade a tus amigos en <em>Usuarios de prueba</em> si la app está en modo prueba).</li>
+          <li>Ve a <strong>Credenciales → Crear credenciales → ID de cliente de OAuth</strong> (tipo <em>Aplicación web</em>).</li>
+          <li>En <strong>Orígenes autorizados de JavaScript</strong>, agrega tu dominio de GitHub Pages (ej. <code class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300">https://tuusuario.github.io</code>).</li>
+          <li>Copia el <strong>ID de cliente</strong> y pégalo en la variable <code class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">GOOGLE_CLIENT_ID</code> al inicio del código JavaScript de este archivo.</li>
+        </ol>
+        <div class="flex justify-end pt-2">
+          <button onclick="closeSetupHelpModal()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition cursor-pointer">
+            Entendido
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Canvas oculto para redimensionar y comprimir miniaturas subidas -->
   <canvas id="image-resizer-canvas" class="hidden"></canvas>
 
   <!-- ===================================================================== -->
-  <!-- LÓGICA DE APLICACIÓN JAVASCRIPT                                       -->
+  <!-- LÓGICA DE APLICACIÓN JAVASCRIPT + GOOGLE SHEETS & DRIVE API (OAUTH 2) -->
   <!-- ===================================================================== -->
   <script>
-    // Clave de almacenamiento persistente
+    // =========================================================================
+    // CONFIGURACIÓN DE GOOGLE OAUTH 2.0
+    // =========================================================================
+    // Client ID público de Google Cloud (nunca se incluye el Client Secret en frontend)
+    const GOOGLE_CLIENT_ID = '453664187536-kdc3ntflb9nd61f1hdo0e54liihvlm3c.apps.googleusercontent.com';
+
+    // Constantes de Google Drive & Google Sheets
+    const SPREADSHEET_NAME = 'BiblioTrack_Registros';
+    const SHEET_TAB_NAME = 'Registros';
+    const SHEET_HEADERS = [
+      'id',
+      'title',
+      'type',
+      'totalPages',
+      'readPages',
+      'totalChapters',
+      'readChapters',
+      'isSaga',
+      'sagaName',
+      'sagaOrder',
+      'coverUrl',
+      'updatedAt'
+    ];
+    // Scope seguro: solo da acceso a los archivos creados por BiblioTrack en el Drive del usuario
+    const OAUTH_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+
+    // Claves de almacenamiento local y caché de portadas Base64
     const STORAGE_KEY = 'bibliotrack_entries_v1';
+    const COVER_CACHE_KEY = 'bibliotrack_cover_cache_v1';
+    const SESSION_META_KEY = 'bibliotrack_google_session_v1';
+
+    // Detecta si ya se configuró un Client ID real
+    const isGoogleConfigured = Boolean(
+      GOOGLE_CLIENT_ID &&
+      !GOOGLE_CLIENT_ID.includes('TU_CLIENT_ID_AQUI') &&
+      GOOGLE_CLIENT_ID.includes('.apps.googleusercontent.com')
+    );
+
+    // Estado de sesión de Google
+    let tokenClient = null;
+    let accessToken = null;
+    let userProfile = null;
+    let activeSpreadsheetId = null;
+    let isSyncingNow = false;
+    let pendingSyncReschedule = false;
 
     // Estado global de la aplicación
     let library = [];
-    let currentStatusFilter = 'all'; // 'all' | 'active' | 'completed'
+    let currentStatusFilter = 'all'; // 'all' | 'active' | 'pending' | 'completed'
     let currentTypeFilter = 'all';   // 'all' | 'Libro' | 'Cómic' | 'Manga'
     let currentBase64Cover = '';     // Almacena temporalmente la imagen procesada del formulario
-    let lastPickedId = null;         // Evita repetir exactamente el mismo libro al volver a sortear si hay más opciones
+    let lastPickedId = null;         // Evita repetir exactamente el mismo libro al volver a sortear
 
     // =========================================================================
-    // 1. INICIALIZACIÓN Y PERSISTENCIA
+    // 1. INICIALIZACIÓN DE GOOGLE IDENTITY SERVICES Y PERSISTENCIA HÍBRIDA
     // =========================================================================
-    document.addEventListener('DOMContentLoaded', () => {
-      loadFromStorage();
+    function initGoogleAuth() {
+      // Cargar primero desde localStorage para renderizado instantáneo
+      loadFromLocalStorage();
       renderLibrary();
+
+      // Mostrar u ocultar botón de ayuda según si ya se pegó el Client ID
+      const helpBtn = document.getElementById('setup-help-btn');
+      if (helpBtn) {
+        helpBtn.classList.toggle('hidden', isGoogleConfigured);
+      }
+
+      if (!isGoogleConfigured) {
+        updateSyncUI('local_unconfigured');
+        return;
+      }
+
+      updateSyncUI('local');
+
+      // Esperar a que cargue el script de Google Identity Services
+      const waitForGsi = setInterval(() => {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+          clearInterval(waitForGsi);
+          tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: OAUTH_SCOPES,
+            callback: handleOAuthTokenResponse
+          });
+
+          // Si el usuario tenía una sesión previa guardada, intentar reconexión silenciosa
+          const savedSession = getSavedSessionMeta();
+          if (savedSession && savedSession.email) {
+            try {
+              tokenClient.requestAccessToken({ prompt: '', login_hint: savedSession.email });
+            } catch (e) {
+              // Si requiere interacción manual, el usuario podrá pulsar el botón
+            }
+          }
+        }
+      }, 200);
+    }
+
+    /**
+     * Inicia el flujo OAuth 2.0 al pulsar "Conectar con Google Sheets"
+     */
+    window.connectGoogleSheets = function () {
+      if (!isGoogleConfigured) {
+        openSetupHelpModal();
+        showToast('Configura primero tu GOOGLE_CLIENT_ID para habilitar Google Sheets.', 'info');
+        return;
+      }
+
+      if (!tokenClient) {
+        showToast('Cargando servicios de Google, intenta de nuevo en un segundo...', 'info');
+        return;
+      }
+
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+    };
+
+    /**
+     * Callback tras obtener el Access Token de Google
+     */
+    async function handleOAuthTokenResponse(tokenResponse) {
+      if (tokenResponse.error) {
+        console.error('Error OAuth:', tokenResponse);
+        if (tokenResponse.error !== 'popup_closed_by_user' && tokenResponse.error !== 'access_denied') {
+          showToast('No se pudo autorizar el acceso con Google.', 'error');
+        }
+        return;
+      }
+
+      accessToken = tokenResponse.access_token;
+      updateSyncUI('syncing');
+
+      try {
+        // 1. Obtener perfil (correo y nombre) desde userinfo
+        const profileRes = await googleApiFetch('https://www.googleapis.com/oauth2/v3/userinfo');
+        userProfile = {
+          email: profileRes.email || '',
+          name: profileRes.name || profileRes.email || 'Usuario',
+          picture: profileRes.picture || ''
+        };
+        saveSessionMeta(userProfile);
+        updateAuthHeaderUI(userProfile);
+
+        // 2. Buscar o crear el Google Sheet "BiblioTrack_Registros" en Google Drive
+        await findOrCreateUserSpreadsheet();
+
+        // 3. Cargar registros desde la hoja (o subir los locales si la hoja está recién creada/vacía)
+        await syncFromSheetOnLogin();
+
+        showToast(`Conectado con ${userProfile.email}`, 'success');
+      } catch (err) {
+        console.error('Error conectando con Google Sheets:', err);
+        updateSyncUI('error');
+        showToast('Error al conectar con Google Drive/Sheets. Revisa tus permisos.', 'error');
+      }
+    }
+
+    window.signOutGoogleSheets = function () {
+      if (accessToken && window.google && window.google.accounts && window.google.accounts.oauth2) {
+        try {
+          window.google.accounts.oauth2.revoke(accessToken, () => {});
+        } catch (e) {}
+      }
+      accessToken = null;
+      userProfile = null;
+      activeSpreadsheetId = null;
+      localStorage.removeItem(SESSION_META_KEY);
+      updateAuthHeaderUI(null);
+      updateSyncUI('local');
+      showToast('Sesión de Google cerrada. Sigues en modo local.', 'info');
+    };
+
+    function updateAuthHeaderUI(profile) {
+      const loginGroup = document.getElementById('google-login-group');
+      const profileBox = document.getElementById('user-profile-box');
+      const avatarImg = document.getElementById('user-avatar');
+      const nameSpan = document.getElementById('user-display-name');
+      const emailSpan = document.getElementById('user-display-email');
+
+      if (profile) {
+        loginGroup.classList.add('hidden');
+        profileBox.classList.remove('hidden');
+        profileBox.classList.add('flex');
+        nameSpan.textContent = profile.name;
+        emailSpan.textContent = profile.email;
+        avatarImg.src = profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=10b981&color=fff`;
+      } else {
+        loginGroup.classList.remove('hidden');
+        profileBox.classList.add('hidden');
+        profileBox.classList.remove('flex');
+        const sheetLink = document.getElementById('open-sheet-link');
+        if (sheetLink) sheetLink.href = '#';
+      }
+      lucide.createIcons();
+    }
+
+    function updateSyncUI(state) {
+      const dot = document.getElementById('sync-status-dot');
+      const text = document.getElementById('sync-status-text');
+      const footerNote = document.getElementById('footer-storage-note');
+
+      if (state === 'synced') {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+        text.textContent = 'Google Sheet Activo';
+        text.className = 'text-emerald-300 font-semibold';
+        if (footerNote) footerNote.textContent = `BiblioTrack — Sincronizado con tu hoja "${SPREADSHEET_NAME}" en Google Drive.`;
+      } else if (state === 'syncing') {
+        dot.className = 'w-2 h-2 rounded-full bg-sky-400 animate-ping';
+        text.textContent = 'Sincronizando...';
+        text.className = 'text-sky-300 font-semibold';
+      } else if (state === 'error') {
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.textContent = 'Error Sync';
+        text.className = 'text-rose-300 font-semibold';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'Modo Local';
+        text.className = 'text-slate-400';
+        if (footerNote) footerNote.textContent = 'BiblioTrack — Guardado localmente. Conecta tu Google Sheet para sincronizar entre dispositivos.';
+      }
+    }
+
+    // =========================================================================
+    // 2. GOOGLE DRIVE API & GOOGLE SHEETS API (LECTURA Y ESCRITURA)
+    // =========================================================================
+    async function googleApiFetch(url, options = {}) {
+      if (!accessToken) throw new Error('Sin token de acceso');
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      };
+      const res = await fetch(url, { ...options, headers });
+      if (res.status === 401) {
+        // Token expirado
+        accessToken = null;
+        updateSyncUI('error');
+        showToast('Tu sesión de Google expiró. Pulsa "Conectar con Google Sheets" nuevamente.', 'error');
+        throw new Error('Token expirado (401)');
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Google API Error (${res.status}): ${errText}`);
+      }
+      return res.json();
+    }
+
+    /**
+     * Busca en Drive un spreadsheet llamado "BiblioTrack_Registros" no eliminado;
+     * si no existe, lo crea con la pestaña "Registros" y los encabezados formateados.
+     */
+    async function findOrCreateUserSpreadsheet() {
+      const query = encodeURIComponent(
+        `name = '${SPREADSHEET_NAME}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
+      );
+      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink)&orderBy=modifiedTime desc`;
+      const searchData = await googleApiFetch(searchUrl);
+
+      if (searchData.files && searchData.files.length > 0) {
+        activeSpreadsheetId = searchData.files[0].id;
+        const sheetLink = document.getElementById('open-sheet-link');
+        if (sheetLink) {
+          sheetLink.href = searchData.files[0].webViewLink || `https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit`;
+        }
+        await ensureSheetTabAndHeaders();
+        return;
+      }
+
+      // Crear nuevo Google Sheet mediante Sheets API v4
+      const createPayload = {
+        properties: {
+          title: SPREADSHEET_NAME
+        },
+        sheets: [
+          {
+            properties: {
+              title: SHEET_TAB_NAME,
+              gridProperties: {
+                frozenRowCount: 1
+              }
+            }
+          }
+        ]
+      };
+
+      const created = await googleApiFetch('https://sheets.googleapis.com/v4/spreadsheets', {
+        method: 'POST',
+        body: JSON.stringify(createPayload)
+      });
+
+      activeSpreadsheetId = created.spreadsheetId;
+      const sheetId = created.sheets[0].properties.sheetId;
+
+      const sheetLink = document.getElementById('open-sheet-link');
+      if (sheetLink) {
+        sheetLink.href = created.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit`;
+      }
+
+      // Escribir fila de encabezados en A1:L1
+      await googleApiFetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}?valueInputOption=RAW`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ values: [SHEET_HEADERS] })
+        }
+      );
+
+      // Dar formato visual profesional a la fila de encabezados (negrita y fondo oscuro)
+      await googleApiFetch(`https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}:batchUpdate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          requests: [
+            {
+              repeatCell: {
+                range: {
+                  sheetId,
+                  startRowIndex: 0,
+                  endRowIndex: 1,
+                  startColumnIndex: 0,
+                  endColumnIndex: SHEET_HEADERS.length
+                },
+                cell: {
+                  userEnteredFormat: {
+                    backgroundColor: { red: 0.12, green: 0.16, blue: 0.25 },
+                    textFormat: {
+                      foregroundColor: { red: 1, green: 1, blue: 1 },
+                      bold: true
+                    }
+                  }
+                },
+                fields: 'userEnteredFormat(backgroundColor,textFormat)'
+              }
+            }
+          ]
+        })
+      });
+    }
+
+    async function ensureSheetTabAndHeaders() {
+      const meta = await googleApiFetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}?fields=sheets.properties`
+      );
+      const hasTab = (meta.sheets || []).some(s => s.properties && s.properties.title === SHEET_TAB_NAME);
+      if (!hasTab) {
+        await googleApiFetch(`https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}:batchUpdate`, {
+          method: 'POST',
+          body: JSON.stringify({
+            requests: [{ addSheet: { properties: { title: SHEET_TAB_NAME, gridProperties: { frozenRowCount: 1 } } } }]
+          })
+        });
+      }
+
+      const headerRes = await googleApiFetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}`
+      );
+      if (!headerRes.values || headerRes.values.length === 0) {
+        await googleApiFetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L1')}?valueInputOption=RAW`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({ values: [SHEET_HEADERS] })
+          }
+        );
+      }
+    }
+
+    /**
+     * Al iniciar sesión: lee todas las filas del Sheet. Si está vacío y existen
+     * registros locales previos, sube automáticamente esos registros locales al Sheet.
+     */
+    async function syncFromSheetOnLogin() {
+      const rows = await readAllRowsFromSheet();
+      if (rows.length === 0) {
+        const localBackup = getLocalStorageData();
+        if (localBackup.length > 0) {
+          library = localBackup;
+          await writeAllRowsToSheet(library);
+          renderLibrary();
+          showToast(`Se subieron ${localBackup.length} lecturas locales a tu nuevo Google Sheet.`, 'success');
+          return;
+        }
+      }
+
+      library = rows;
+      saveToLocalStorageOnly(library);
+      updateSyncUI('synced');
+      renderLibrary();
+    }
+
+    /**
+     * Botón manual "Sincronizar ahora"
+     */
+    window.manualSyncFromSheet = async function () {
+      if (!accessToken || !activeSpreadsheetId) {
+        connectGoogleSheets();
+        return;
+      }
+      try {
+        updateSyncUI('syncing');
+        const rows = await readAllRowsFromSheet();
+        library = rows;
+        saveToLocalStorageOnly(library);
+        updateSyncUI('synced');
+        renderLibrary();
+        showToast('Biblioteca actualizada desde tu Google Sheet.', 'success');
+      } catch (err) {
+        console.error(err);
+        updateSyncUI('error');
+        showToast('Error al leer tu Google Sheet.', 'error');
+      }
+    };
+
+    async function readAllRowsFromSheet() {
+      const range = encodeURIComponent(`${SHEET_TAB_NAME}!A2:L`);
+      const data = await googleApiFetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${range}`
+      );
+      const values = data.values || [];
+      const coverCache = getCoverCache();
+
+      return values
+        .filter(row => row && row[0] && row[1])
+        .map(row => {
+          const id = String(row[0]);
+          const rawCover = String(row[10] || '');
+          let resolvedCover = rawCover;
+
+          // Si la celda contiene el marcador de portada local grande, recuperarla del caché local
+          if (rawCover.startsWith('LOCAL_CACHE:')) {
+            resolvedCover = coverCache[id] || '';
+          } else if (rawCover.startsWith('data:image')) {
+            // Guardar también en caché local por seguridad
+            saveCoverToCache(id, rawCover);
+          }
+
+          return {
+            id,
+            title: String(row[1] || ''),
+            type: String(row[2] || 'Libro'),
+            pagesTotal: Number(row[3]) || 0,
+            pagesRead: Number(row[4]) || 0,
+            chaptersTotal: Number(row[5]) || 0,
+            chaptersRead: Number(row[6]) || 0,
+            isSaga: String(row[7]).toUpperCase() === 'TRUE' || row[7] === '1' || row[7] === 'Sí',
+            sagaName: String(row[8] || ''),
+            sagaOrder: Math.max(1, Number(row[9]) || 1),
+            cover: resolvedCover,
+            updatedAt: Number(row[11]) || Date.now()
+          };
+        });
+    }
+
+    /**
+     * Escribe el estado completo en la pestaña "Registros" de Google Sheets.
+     * Maneja colas para evitar conflictos si el usuario pulsa "+1 Pág" varias veces seguidas.
+     */
+    async function writeAllRowsToSheet(booksList) {
+      if (!accessToken || !activeSpreadsheetId) return;
+
+      if (isSyncingNow) {
+        pendingSyncReschedule = true;
+        return;
+      }
+
+      isSyncingNow = true;
+      updateSyncUI('syncing');
+
+      try {
+        const rows = booksList.map(book => {
+          let sheetCoverValue = book.cover || '';
+          // Google Sheets tiene un límite estricto de 50,000 caracteres por celda.
+          // Si la portada Base64 supera 45,000 caracteres, la guardamos en el caché local indexado por ID
+          // y colocamos un marcador ligero en la celda para no romper la sincronización.
+          if (sheetCoverValue.startsWith('data:image')) {
+            saveCoverToCache(book.id, sheetCoverValue);
+            if (sheetCoverValue.length > 45000) {
+              sheetCoverValue = `LOCAL_CACHE:${book.id}`;
+            }
+          }
+
+          return [
+            book.id,
+            book.title,
+            book.type || 'Libro',
+            Number(book.pagesTotal) || 0,
+            Number(book.pagesRead) || 0,
+            Number(book.chaptersTotal) || 0,
+            Number(book.chaptersRead) || 0,
+            book.isSaga ? 'TRUE' : 'FALSE',
+            book.isSaga ? (book.sagaName || '') : '',
+            book.isSaga ? (Number(book.sagaOrder) || 1) : 1,
+            sheetCoverValue,
+            Number(book.updatedAt) || Date.now()
+          ];
+        });
+
+        // 1. Limpiar filas anteriores A2:L
+        await googleApiFetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A2:L')}:clear`,
+          { method: 'POST', body: JSON.stringify({}) }
+        );
+
+        // 2. Escribir encabezados y todas las filas actualizadas en A1:L
+        const allValues = [SHEET_HEADERS, ...rows];
+        await googleApiFetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${activeSpreadsheetId}/values/${encodeURIComponent(SHEET_TAB_NAME + '!A1:L' + allValues.length)}?valueInputOption=RAW`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({ values: allValues })
+          }
+        );
+
+        updateSyncUI('synced');
+      } catch (err) {
+        console.error('Error sincronizando filas con Google Sheets:', err);
+        updateSyncUI('error');
+        showToast('Error al sincronizar cambios con tu Google Sheet.', 'error');
+      } finally {
+        isSyncingNow = false;
+        if (pendingSyncReschedule) {
+          pendingSyncReschedule = false;
+          writeAllRowsToSheet(library);
+        }
+      }
+    }
+
+    // =========================================================================
+    // CACHÉ LOCAL DE PORTADAS Y OPERACIONES CRUD HÍBRIDAS
+    // =========================================================================
+    function getCoverCache() {
+      try {
+        const raw = localStorage.getItem(COVER_CACHE_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveCoverToCache(id, base64Str) {
+      try {
+        const cache = getCoverCache();
+        cache[id] = base64Str;
+        localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
+      } catch (e) {}
+    }
+
+    function removeCoverFromCache(id) {
+      try {
+        const cache = getCoverCache();
+        delete cache[id];
+        localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
+      } catch (e) {}
+    }
+
+    function getSavedSessionMeta() {
+      try {
+        const raw = localStorage.getItem(SESSION_META_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveSessionMeta(meta) {
+      try {
+        localStorage.setItem(SESSION_META_KEY, JSON.stringify(meta));
+      } catch (e) {}
+    }
+
+    function getLocalStorageData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function loadFromLocalStorage() {
+      library = getLocalStorageData();
+    }
+
+    function saveToLocalStorageOnly(data) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {
+        console.error('Error al guardar en localStorage:', err);
+      }
+    }
+
+    async function persistBookEntry(bookObj) {
+      const idx = library.findIndex(b => b.id === bookObj.id);
+      if (idx !== -1) {
+        library[idx] = bookObj;
+      } else {
+        library.unshift(bookObj);
+      }
+
+      if (bookObj.cover && bookObj.cover.startsWith('data:image')) {
+        saveCoverToCache(bookObj.id, bookObj.cover);
+      }
+
+      saveToLocalStorageOnly(library);
+      renderLibrary();
+
+      if (accessToken && activeSpreadsheetId) {
+        await writeAllRowsToSheet(library);
+      }
+    }
+
+    async function removeBookEntry(bookId) {
+      library = library.filter(b => b.id !== bookId);
+      removeCoverFromCache(bookId);
+      saveToLocalStorageOnly(library);
+      renderLibrary();
+
+      if (accessToken && activeSpreadsheetId) {
+        await writeAllRowsToSheet(library);
+      }
+    }
+
+    async function replaceAllBooks(newList) {
+      library = newList;
+      saveToLocalStorageOnly(library);
+      renderLibrary();
+
+      if (accessToken && activeSpreadsheetId) {
+        await writeAllRowsToSheet(library);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initGoogleAuth();
       lucide.createIcons();
 
       // Cerrar menú desplegable de respaldo al hacer clic fuera
@@ -510,36 +1204,9 @@
       });
     });
 
-    function loadFromStorage() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          library = JSON.parse(raw);
-        } else {
-          library = [];
-        }
-      } catch (err) {
-        console.error('Error al leer localStorage:', err);
-        library = [];
-      }
-    }
-
-    function saveToStorage() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-      } catch (err) {
-        console.error('Error al guardar en localStorage:', err);
-        showToast('Almacenamiento lleno. Intenta usar imágenes más ligeras o exportar un respaldo.', 'error');
-      }
-    }
-
     // =========================================================================
-    // 2. CÁLCULOS DE PROGRESO, COLOR HSL Y ESTADO COMPLETADO
+    // 3. CÁLCULOS DE PROGRESO, COLOR HSL Y ESTADO COMPLETADO
     // =========================================================================
-    /**
-     * Calcula el porcentaje de avance (0 a 100) y determina si está terminado.
-     * Prioriza páginas si páginas totales > 0; si no, usa capítulos totales > 0.
-     */
     function calculateProgress(item) {
       const pTotal = Number(item.pagesTotal) || 0;
       const pRead = Number(item.pagesRead) || 0;
@@ -551,10 +1218,7 @@
       let basis = 'none';
 
       if (pTotal > 0 && cTotal > 0) {
-        // Ambas métricas existen: priorizamos páginas para el porcentaje fino,
-        // y consideramos completado si alcanzó páginas totales o capítulos totales.
         const pagePct = Math.min(100, Math.max(0, (pRead / pTotal) * 100));
-        const chapPct = Math.min(100, Math.max(0, (cRead / cTotal) * 100));
         isCompleted = (pRead >= pTotal) || (cRead >= cTotal);
         percent = isCompleted ? 100 : Math.round(pagePct);
         basis = 'pages';
@@ -567,7 +1231,6 @@
         percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((cRead / cTotal) * 100)));
         basis = 'chapters';
       } else {
-        // Caso sin totales definidos aún
         percent = 0;
         isCompleted = false;
       }
@@ -581,28 +1244,16 @@
     function getProgressColorHSL(percent) {
       const clamped = Math.min(100, Math.max(0, percent));
       const hue = Math.round((clamped / 100) * 120);
-      // Saturación y luminosidad equilibradas para máxima legibilidad
       return `hsl(${hue}, 82%, 48%)`;
     }
 
     // =========================================================================
-    // 3. LÓGICA DE SAGAS Y ELEGIBILIDAD PARA "LECTURA DEL DÍA"
+    // 4. LÓGICA DE SAGAS Y ELEGIBILIDAD PARA "LECTURA DEL DÍA"
     // =========================================================================
-    /**
-     * Normaliza el nombre de la saga para agrupar correctamente sin importar
-     * mayúsculas, tildes opcionales o espacios extra.
-     */
     function normalizeSagaName(name) {
       return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
 
-    /**
-     * Devuelve la lista exacta de títulos elegibles para ser recomendados hoy:
-     * - Excluye todos los títulos terminados (100%).
-     * - Incluye todos los títulos independientes (no pertenecen a saga) no terminados.
-     * - Para cada saga, agrupa sus títulos, los ordena por # de entrega ascendente,
-     *   y selecciona ÚNICAMENTE el título no terminado con el # de entrega más bajo.
-     */
     function getEligibleDailyBooks() {
       const eligible = [];
       const sagaGroups = new Map();
@@ -617,19 +1268,14 @@
           }
           sagaGroups.get(normKey).push({ item, isCompleted });
         } else {
-          // Título independiente
           if (!isCompleted) {
             eligible.push(item);
           }
         }
       }
 
-      // Evaluar cada saga por separado
       for (const [, entries] of sagaGroups.entries()) {
-        // Ordenar por número de entrega (1, 2, 3...)
         entries.sort((a, b) => (Number(a.item.sagaOrder) || 1) - (Number(b.item.sagaOrder) || 1));
-
-        // Buscar el primer tomo/libro NO terminado en orden ascendente
         const nextInSaga = entries.find(entry => !entry.isCompleted);
         if (nextInSaga) {
           eligible.push(nextInSaga.item);
@@ -639,10 +1285,6 @@
       return eligible;
     }
 
-    /**
-     * Helper para saber si un libro específico de una saga está bloqueado
-     * porque existe una entrega anterior sin terminar.
-     */
     function getSagaLockInfo(targetItem) {
       if (!targetItem.isSaga || !targetItem.sagaName) return { isLocked: false };
       const { isCompleted } = calculateProgress(targetItem);
@@ -665,9 +1307,9 @@
     }
 
     // =========================================================================
-    // 4. RENDERIZADO DE LA BIBLIOTECA Y ESTADÍSTICAS
+    // 5. RENDERIZADO DE LA BIBLIOTECA Y ESTADÍSTICAS
     // =========================================================================
-    function setStatusFilter(status) {
+    window.setStatusFilter = function (status) {
       currentStatusFilter = status;
       document.querySelectorAll('.filter-status-btn').forEach(btn => {
         btn.classList.remove('bg-indigo-600', 'text-white');
@@ -679,9 +1321,9 @@
         activeBtn.classList.remove('text-slate-400');
       }
       renderLibrary();
-    }
+    };
 
-    function setTypeFilter(type) {
+    window.setTypeFilter = function (type) {
       currentTypeFilter = type;
       document.querySelectorAll('.filter-type-btn').forEach(btn => {
         btn.classList.remove('bg-slate-800', 'text-white');
@@ -693,7 +1335,7 @@
         activeBtn.classList.remove('text-slate-400');
       }
       renderLibrary();
-    }
+    };
 
     function updateStats() {
       const total = library.length;
@@ -738,17 +1380,17 @@
       `;
     }
 
-    function renderLibrary() {
+    window.renderLibrary = function () {
       updateStats();
       const grid = document.getElementById('library-grid');
       const emptyState = document.getElementById('empty-state');
       const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
 
-      // Filtrar elementos
       const filtered = library.filter(item => {
-        const { isCompleted } = calculateProgress(item);
+        const { percent, isCompleted } = calculateProgress(item);
 
-        if (currentStatusFilter === 'active' && isCompleted) return false;
+        if (currentStatusFilter === 'active' && (isCompleted || percent === 0)) return false;
+        if (currentStatusFilter === 'pending' && (isCompleted || percent > 0)) return false;
         if (currentStatusFilter === 'completed' && !isCompleted) return false;
         if (currentTypeFilter !== 'all' && item.type !== currentTypeFilter) return false;
 
@@ -760,7 +1402,6 @@
         return true;
       });
 
-      // Ordenar: primero los en progreso (agrupando sagas por orden), luego completados
       filtered.sort((a, b) => {
         const compA = calculateProgress(a).isCompleted ? 1 : 0;
         const compB = calculateProgress(b).isCompleted ? 1 : 0;
@@ -782,7 +1423,7 @@
       emptyState.classList.add('hidden');
       grid.innerHTML = filtered.map(item => createBookCardHTML(item)).join('');
       lucide.createIcons();
-    }
+    };
 
     function createBookCardHTML(item) {
       const { percent, isCompleted } = calculateProgress(item);
@@ -794,13 +1435,11 @@
       const cTotal = Number(item.chaptersTotal) || 0;
       const cRead = Number(item.chaptersRead) || 0;
 
-      // Portada o fallback
       const coverHTML = item.cover
         ? `<img src="${escapeHTML(item.cover)}" alt="${escapeHTML(item.title)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" class="w-full h-full object-cover" />
            <div style="display:none;" class="w-full h-full">${getPlaceholderCoverHTML(item.type)}</div>`
         : getPlaceholderCoverHTML(item.type);
 
-      // Etiqueta de Saga
       const sagaBadgeHTML = (item.isSaga && item.sagaName)
         ? `<div class="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-300 font-medium">
              <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
@@ -812,7 +1451,6 @@
              <span>Lectura independiente</span>
            </div>`;
 
-      // Estado de completado o bloqueo de saga
       let statusPill = '';
       if (isCompleted) {
         statusPill = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Completado</span>`;
@@ -824,13 +1462,11 @@
         <article class="bg-slate-900/90 hover:bg-slate-900 border ${isCompleted ? 'border-emerald-500/30' : 'border-slate-800/90 hover:border-slate-700'} rounded-2xl p-4 flex flex-col justify-between gap-4 shadow-lg transition-all duration-200 group">
           <!-- Parte Superior: Miniatura + Info -->
           <div class="flex gap-4">
-            <!-- Miniatura -->
             <div class="w-24 h-36 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0 shadow-md relative">
               ${coverHTML}
               ${isCompleted ? '<div class="absolute inset-0 bg-emerald-950/35 flex items-center justify-center"><div class="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg"><i data-lucide="check" class="w-5 h-5 stroke-[3]"></i></div></div>' : ''}
             </div>
 
-            <!-- Detalles -->
             <div class="flex-1 min-w-0 flex flex-col justify-between">
               <div>
                 <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
@@ -845,7 +1481,6 @@
                 ${sagaBadgeHTML}
               </div>
 
-              <!-- Contadores numéricos -->
               <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div class="bg-slate-950/90 border border-slate-800/80 rounded-xl px-2.5 py-1.5">
                   <span class="text-slate-400 block text-[10px] uppercase tracking-wider">Páginas</span>
@@ -859,7 +1494,7 @@
             </div>
           </div>
 
-          <!-- Parte Media: Barra de Progreso Dinámica (Rojo a Verde) -->
+          <!-- Parte Media: Barra de Progreso Dinámica -->
           <div class="space-y-1.5">
             <div class="flex items-center justify-between text-xs">
               <span class="text-slate-400 font-medium">Progreso de lectura</span>
@@ -897,11 +1532,11 @@
     // =========================================================================
     // 5. ACCIONES RÁPIDAS EN TARJETAS (+1 PÁGINA / +1 CAPÍTULO)
     // =========================================================================
-    function incrementProgress(id, field) {
+    window.incrementProgress = async function (id, field) {
       const idx = library.findIndex(b => b.id === id);
       if (idx === -1) return;
 
-      const item = library[idx];
+      const item = { ...library[idx] };
       const wasCompleted = calculateProgress(item).isCompleted;
 
       if (field === 'pages') {
@@ -915,17 +1550,16 @@
       }
 
       item.updatedAt = Date.now();
-      saveToStorage();
-      renderLibrary();
+      await persistBookEntry(item);
 
       const nowCompleted = calculateProgress(item).isCompleted;
       if (!wasCompleted && nowCompleted) {
         showToast(`🎉 ¡Completaste "${item.title}"!`, 'success');
       }
-    }
+    };
 
     // =========================================================================
-    // 6. FORMULARIO DE REGISTRO / EDICIÓN Y PROCESAMIENTO DE IMÁGENES
+    // 6. FORMULARIO DE REGISTRO / EDICIÓN Y COMPRESIÓN DE MINIATURAS (< 100KB)
     // =========================================================================
     function populateSagasDatalist() {
       const datalist = document.getElementById('existing-sagas-list');
@@ -943,7 +1577,7 @@
         .join('');
     }
 
-    function openFormModal(editId = null) {
+    window.openFormModal = function (editId = null) {
       populateSagasDatalist();
       const modal = document.getElementById('form-modal');
       const form = document.getElementById('book-form');
@@ -962,11 +1596,9 @@
         document.getElementById('entry-id').value = item.id;
         document.getElementById('title-input').value = item.title;
 
-        // Seleccionar tipo
         const typeRadio = document.querySelector(`input[name="work-type"][value="${item.type}"]`);
         if (typeRadio) typeRadio.checked = true;
 
-        // Saga
         const isSagaCheck = document.getElementById('is-saga-checkbox');
         isSagaCheck.checked = Boolean(item.isSaga);
         toggleSagaFields();
@@ -975,13 +1607,11 @@
           document.getElementById('saga-order-input').value = item.sagaOrder || 1;
         }
 
-        // Páginas y Capítulos
         document.getElementById('pages-read-input').value = item.pagesRead || 0;
         document.getElementById('pages-total-input').value = item.pagesTotal || 0;
         document.getElementById('chapters-read-input').value = item.chaptersRead || 0;
         document.getElementById('chapters-total-input').value = item.chaptersTotal || 0;
 
-        // Portada
         if (item.cover) {
           if (item.cover.startsWith('data:image')) {
             currentBase64Cover = item.cover;
@@ -1000,13 +1630,13 @@
       updateFormLivePreview();
       modal.classList.remove('hidden');
       lucide.createIcons();
-    }
+    };
 
-    function closeFormModal() {
+    window.closeFormModal = function () {
       document.getElementById('form-modal').classList.add('hidden');
-    }
+    };
 
-    function toggleSagaFields() {
+    window.toggleSagaFields = function () {
       const checked = document.getElementById('is-saga-checkbox').checked;
       const container = document.getElementById('saga-fields-container');
       const sagaNameInput = document.getElementById('saga-name-input');
@@ -1023,9 +1653,9 @@
         sagaNameInput.required = false;
         sagaOrderInput.required = false;
       }
-    }
+    };
 
-    function updateFormLivePreview() {
+    window.updateFormLivePreview = function () {
       const tempItem = {
         pagesRead: Number(document.getElementById('pages-read-input').value) || 0,
         pagesTotal: Number(document.getElementById('pages-total-input').value) || 0,
@@ -1042,13 +1672,14 @@
       badge.style.color = color;
       bar.style.width = `${percent}%`;
       bar.style.backgroundColor = color;
-    }
+    };
 
     /**
-     * Redimensiona y comprime la imagen subida desde el dispositivo a ~200x300px
-     * usando un canvas oculto para optimizar el espacio en localStorage.
+     * Comprime y redimensiona la imagen en base64 garantizando un peso ligero (< 42 KB)
+     * para caber directamente dentro de una celda de Google Sheets (límite 50,000 caracteres)
+     * y sincronizarse entre todos los dispositivos del usuario.
      */
-    function handleImageUpload(event) {
+    window.handleImageUpload = function (event) {
       const file = event.target.files[0];
       if (!file) return;
 
@@ -1064,12 +1695,11 @@
           const canvas = document.getElementById('image-resizer-canvas');
           const ctx = canvas.getContext('2d');
 
-          const MAX_W = 220;
-          const MAX_H = 330;
+          const MAX_W = 160;
+          const MAX_H = 240;
           let width = img.width;
           let height = img.height;
 
-          // Mantener proporción dentro de 220x330
           if (width > height) {
             if (width > MAX_W) {
               height = Math.round((height * MAX_W) / width);
@@ -1087,19 +1717,25 @@
           ctx.clearRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Convertir a JPEG comprimido (calidad 0.8) para ahorrar espacio en localStorage
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          // Ajustar calidad progresivamente para asegurar < 42,000 caracteres (compatible con celdas de Google Sheets)
+          let quality = 0.72;
+          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          while (compressedBase64.length > 42000 && quality > 0.25) {
+            quality -= 0.1;
+            compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          }
+
           currentBase64Cover = compressedBase64;
           document.getElementById('cover-url-input').value = '';
           updateCoverPreviewUI(compressedBase64);
-          showToast('Portada cargada y optimizada.', 'success');
+          showToast('Portada optimizada lista para guardar en Google Sheets.', 'success');
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
-    }
+    };
 
-    function handleCoverUrlInput(url) {
+    window.handleCoverUrlInput = function (url) {
       const trimmed = url.trim();
       if (trimmed) {
         currentBase64Cover = '';
@@ -1107,14 +1743,14 @@
       } else if (!currentBase64Cover) {
         updateCoverPreviewUI('');
       }
-    }
+    };
 
-    function clearCoverImage() {
+    window.clearCoverImage = function () {
       currentBase64Cover = '';
       document.getElementById('cover-file-input').value = '';
       document.getElementById('cover-url-input').value = '';
       updateCoverPreviewUI('');
-    }
+    };
 
     function updateCoverPreviewUI(src) {
       const imgEl = document.getElementById('cover-preview-img');
@@ -1134,11 +1770,9 @@
       }
     }
 
-    function updatePlaceholderIcon() {
-      // Actualiza visualmente si es necesario
-    }
+    window.updatePlaceholderIcon = function () {};
 
-    function handleFormSubmit(event) {
+    window.handleFormSubmit = async function (event) {
       event.preventDefault();
 
       const id = document.getElementById('entry-id').value;
@@ -1167,27 +1801,25 @@
       }
 
       if (id) {
-        // Actualizar existente
-        const index = library.findIndex(b => b.id === id);
-        if (index !== -1) {
-          library[index] = {
-            ...library[index],
-            title,
-            type,
-            isSaga,
-            sagaName,
-            sagaOrder,
-            pagesRead,
-            pagesTotal,
-            chaptersRead,
-            chaptersTotal,
-            cover: finalCover,
-            updatedAt: Date.now()
-          };
-          showToast('Lectura actualizada correctamente.', 'success');
-        }
+        const existing = library.find(b => b.id === id);
+        const updatedEntry = {
+          ...(existing || {}),
+          id,
+          title,
+          type,
+          isSaga,
+          sagaName,
+          sagaOrder,
+          pagesRead,
+          pagesTotal,
+          chaptersRead,
+          chaptersTotal,
+          cover: finalCover,
+          updatedAt: Date.now()
+        };
+        await persistBookEntry(updatedEntry);
+        showToast('Lectura actualizada correctamente.', 'success');
       } else {
-        // Crear nuevo
         const newEntry = {
           id: 'book_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           title,
@@ -1203,29 +1835,27 @@
           createdAt: Date.now(),
           updatedAt: Date.now()
         };
-        library.unshift(newEntry);
+        await persistBookEntry(newEntry);
         showToast('¡Lectura agregada a tu biblioteca!', 'success');
       }
 
-      saveToStorage();
-      renderLibrary();
       closeFormModal();
-    }
+    };
 
     // =========================================================================
     // 7. MODAL "LECTURA DEL DÍA" CON ANIMACIÓN DE RULETA Y LÓGICA DE SAGAS
     // =========================================================================
-    function openDailyPickModal() {
+    window.openDailyPickModal = function () {
       const modal = document.getElementById('daily-modal');
       modal.classList.remove('hidden');
       spinDailyRoulette();
-    }
+    };
 
-    function closeDailyModal() {
+    window.closeDailyModal = function () {
       document.getElementById('daily-modal').classList.add('hidden');
-    }
+    };
 
-    function spinDailyRoulette() {
+    window.spinDailyRoulette = function () {
       const body = document.getElementById('daily-modal-body');
       const eligible = getEligibleDailyBooks();
 
@@ -1248,7 +1878,6 @@
         return;
       }
 
-      // Elegir ganador evitando repetir el último si hay más de 1 opción
       let pool = eligible;
       if (eligible.length > 1 && lastPickedId) {
         pool = eligible.filter(b => b.id !== lastPickedId);
@@ -1256,7 +1885,6 @@
       const winner = pool[Math.floor(Math.random() * pool.length)];
       lastPickedId = winner.id;
 
-      // Animación breve de suspenso / ruleta ciclando nombres
       let ticks = 0;
       const maxTicks = 12;
       body.innerHTML = `
@@ -1281,7 +1909,7 @@
           renderDailyWinner(winner, eligible.length);
         }
       }, 75);
-    }
+    };
 
     function renderDailyWinner(winner, totalEligible) {
       const body = document.getElementById('daily-modal-body');
@@ -1306,19 +1934,16 @@
         <div class="animate-pop-in space-y-5">
           <div class="text-xs font-bold uppercase tracking-widest text-emerald-400">✨ Tu lectura recomendada de hoy ✨</div>
 
-          <!-- Portada destacada -->
           <div class="w-32 h-48 mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 border-indigo-500/50 shadow-2xl shadow-indigo-500/20">
             ${coverHTML}
           </div>
 
-          <!-- Título y detalles -->
           <div>
             <div class="mb-1.5">${getTypeBadgeHTML(winner.type)}</div>
             <h3 class="text-xl font-extrabold text-white leading-snug">${escapeHTML(winner.title)}</h3>
             ${sagaInfoHTML}
           </div>
 
-          <!-- Progreso actual -->
           <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 text-left space-y-2">
             <div class="flex justify-between text-xs">
               <span class="text-slate-400">Avance actual</span>
@@ -1333,7 +1958,6 @@
             </div>
           </div>
 
-          <!-- Botones de acción -->
           <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
             ${totalEligible > 1 ? `
               <button onclick="spinDailyRoulette()" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition cursor-pointer">
@@ -1352,7 +1976,7 @@
     // =========================================================================
     // 8. ELIMINACIÓN, RESPALDO JSON Y DATOS DE EJEMPLO
     // =========================================================================
-    function askDeleteEntry(id) {
+    window.askDeleteEntry = function (id) {
       const item = library.find(b => b.id === id);
       if (!item) return;
 
@@ -1360,42 +1984,47 @@
       document.getElementById('confirm-message').textContent = `¿Deseas eliminar "${item.title}" de tu registro? Esta acción no se puede deshacer.`;
 
       const confirmBtn = document.getElementById('confirm-action-btn');
-      confirmBtn.onclick = () => {
-        library = library.filter(b => b.id !== id);
-        saveToStorage();
-        renderLibrary();
+      confirmBtn.onclick = async () => {
+        await removeBookEntry(id);
         closeConfirmModal();
         showToast('Lectura eliminada.', 'info');
       };
 
       document.getElementById('confirm-modal').classList.remove('hidden');
-    }
+    };
 
-    function askClearAllData() {
+    window.askClearAllData = function () {
       document.getElementById('confirm-title').textContent = 'Borrar toda la biblioteca';
-      document.getElementById('confirm-message').textContent = 'Se eliminarán permanentemente todos tus libros, cómics y mangas guardados en este navegador.';
+      document.getElementById('confirm-message').textContent = 'Se eliminarán permanentemente todos tus libros, cómics y mangas registrados.';
 
       const confirmBtn = document.getElementById('confirm-action-btn');
-      confirmBtn.onclick = () => {
-        library = [];
-        saveToStorage();
-        renderLibrary();
+      confirmBtn.onclick = async () => {
+        await replaceAllBooks([]);
         closeConfirmModal();
         showToast('Biblioteca vaciada por completo.', 'info');
       };
 
       document.getElementById('confirm-modal').classList.remove('hidden');
-    }
+    };
 
-    function closeConfirmModal() {
+    window.closeConfirmModal = function () {
       document.getElementById('confirm-modal').classList.add('hidden');
-    }
+    };
 
-    function toggleBackupMenu() {
+    window.openSetupHelpModal = function () {
+      document.getElementById('setup-help-modal').classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.closeSetupHelpModal = function () {
+      document.getElementById('setup-help-modal').classList.add('hidden');
+    };
+
+    window.toggleBackupMenu = function () {
       document.getElementById('backup-menu').classList.toggle('hidden');
-    }
+    };
 
-    function exportJSON() {
+    window.exportJSON = function () {
       const dataStr = JSON.stringify(library, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1408,32 +2037,30 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast('Respaldo JSON descargado.', 'success');
-    }
+    };
 
-    function importJSON(event) {
+    window.importJSON = function (event) {
       const file = event.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const imported = JSON.parse(e.target.result);
           if (!Array.isArray(imported)) {
             throw new Error('Formato inválido');
           }
-          library = imported;
-          saveToStorage();
-          renderLibrary();
-          showToast(`Se importaron ${library.length} lecturas correctamente.`, 'success');
+          await replaceAllBooks(imported);
+          showToast(`Se importaron ${imported.length} lecturas correctamente.`, 'success');
         } catch (err) {
           showToast('El archivo JSON no tiene un formato válido.', 'error');
         }
         event.target.value = '';
       };
       reader.readAsText(file);
-    }
+    };
 
-    function loadDemoData() {
+    window.loadDemoData = async function () {
       const now = Date.now();
       const demoEntries = [
         {
@@ -1528,24 +2155,21 @@
         }
       ];
 
-      // Evitar duplicados si ya existen demos
       const existingIds = new Set(library.map(b => b.id));
       let added = 0;
       for (const item of demoEntries) {
         if (!existingIds.has(item.id)) {
-          library.push(item);
+          await persistBookEntry(item);
           added++;
         }
       }
 
       if (added > 0) {
-        saveToStorage();
-        renderLibrary();
         showToast('Se cargaron ejemplos con sagas para probar la ruleta.', 'success');
       } else {
         showToast('Los ejemplos ya están cargados en tu biblioteca.', 'info');
       }
-    }
+    };
 
     // =========================================================================
     // 9. UTILIDADES DE INTERFAZ (TOAST Y ESCAPE HTML)
