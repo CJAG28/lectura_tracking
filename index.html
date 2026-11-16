@@ -192,6 +192,23 @@
       </div>
     </section>
 
+    <!-- Resumen de Géneros Más Leídos -->
+    <section id="genreStatsSection" class="hidden bg-slate-900/70 border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 space-y-3">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">🏷️</span>
+          <h2 class="text-xs sm:text-sm font-bold text-slate-200">Géneros Más Leídos</h2>
+          <span id="topGenreBadge" class="hidden px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold"></span>
+        </div>
+        <button id="clearGenreFilterBtn" onclick="clearGenreSearch()" class="hidden text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition">
+          Quitar filtro de género
+        </button>
+      </div>
+      <div id="genreStatsList" class="flex flex-wrap gap-2">
+        <!-- Renderizado dinámicamente -->
+      </div>
+    </section>
+    
     <!-- Barra de Búsqueda, Selector de Vista (Sagas vs Individual) y Filtros Deslizables -->
     <section class="space-y-3">
       <div class="flex flex-col sm:flex-row gap-2.5 sm:items-center sm:justify-between">
@@ -1104,6 +1121,77 @@
       document.getElementById('statSagas').textContent = uniqueSagas.size;
       document.getElementById('statInProgress').textContent = inProgress;
       document.getElementById('statCompleted').textContent = completed;
+
+      renderGenreStats();
+    }
+
+    function renderGenreStats() {
+      const section = document.getElementById('genreStatsSection');
+      const listEl = document.getElementById('genreStatsList');
+      const topBadge = document.getElementById('topGenreBadge');
+      const clearBtn = document.getElementById('clearGenreFilterBtn');
+      const currentQuery = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+
+      const genreMap = new Map();
+      books.forEach(book => {
+        const rawGenre = (book.genre || '').trim();
+        if (!rawGenre) return;
+        const key = rawGenre.toLowerCase();
+        if (!genreMap.has(key)) {
+          genreMap.set(key, { name: rawGenre, count: 0, completed: 0 });
+        }
+        const entry = genreMap.get(key);
+        entry.count++;
+        if (calculateBookProgress(book).isCompleted) entry.completed++;
+      });
+
+      if (genreMap.size === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      const sortedGenres = [...genreMap.values()].sort((a, b) => b.count - a.count || b.completed - a.completed);
+
+      const topGenre = sortedGenres[0];
+      topBadge.textContent = `Favorito: ${topGenre.name} (${topGenre.count})`;
+      topBadge.classList.remove('hidden');
+
+      const isGenreFiltered = sortedGenres.some(g => g.name.toLowerCase() === currentQuery);
+      clearBtn.classList.toggle('hidden', !isGenreFiltered);
+
+      listEl.innerHTML = sortedGenres.map(g => {
+        const isActive = currentQuery === g.name.toLowerCase();
+        return `
+          <button
+            onclick="filterByGenre('${escapeHtml(g.name)}')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+              isActive
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
+                : 'bg-slate-950/90 hover:bg-slate-800 border-slate-800 text-slate-300'
+            }"
+            title="${g.completed} completados de ${g.count} registrados"
+          >
+            <span>${escapeHtml(g.name)}</span>
+            <span class="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${isActive ? 'bg-indigo-800 text-white' : 'bg-slate-800 text-indigo-300'}">${g.count}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function filterByGenre(genreName) {
+      const input = document.getElementById('searchInput');
+      if (input.value.trim().toLowerCase() === genreName.toLowerCase()) {
+        input.value = '';
+      } else {
+        input.value = genreName;
+      }
+      renderLibrary();
+    }
+
+    function clearGenreSearch() {
+      document.getElementById('searchInput').value = '';
+      renderLibrary();
     }
 
     function getFilteredBooks() {
@@ -1119,7 +1207,7 @@
         if (currentFilter === 'completed' && !isCompleted) return false;
 
         if (q) {
-          const hay = `${book.title} ${book.author || ''} ${book.sagaName || ''}`.toLowerCase();
+          const hay = `${book.title} ${book.author || ''} ${book.sagaName || ''} ${book.genre || ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -1322,6 +1410,26 @@
       const fallbackCover = `https://placehold.co/136x200/1e293b/94a3b8?text=${encodeURIComponent(book.type)}`;
       const coverUrl = book.cover && book.cover.trim() ? book.cover.trim() : fallbackCover;
 
+      const starsHtml = book.rating > 0
+        ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[10px] font-bold" title="Calificación: ${book.rating}/5">⭐ ${book.rating}/5</span>`
+        : '';
+
+      const genreBadgeHtml = book.genre
+        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[10px] font-semibold">🏷️ ${escapeHtml(book.genre)}</span>`
+        : '';
+
+      let datesHtml = '';
+      if (book.startDate || book.endDate) {
+        const startTxt = book.startDate ? `Inicio: ${book.startDate}` : '';
+        const endTxt = book.endDate ? `Fin: ${book.endDate}` : '';
+        const sep = (book.startDate && book.endDate) ? ' • ' : '';
+        datesHtml = `<p class="text-[10px] text-slate-400 flex items-center gap-1 pt-0.5">📅 ${startTxt}${sep}${endTxt}</p>`;
+      }
+
+      const notesHtml = book.notes
+        ? `<p class="text-[11px] text-slate-400 italic line-clamp-2 bg-slate-950/70 border border-slate-800/70 rounded-lg px-2.5 py-1.5" title="${escapeHtml(book.notes)}">“${escapeHtml(book.notes)}”</p>`
+        : '';
+
       // Texto de contadores independientes
       let metricsHtml = '';
       if (hasBothMetrics) {
@@ -1412,7 +1520,7 @@
       }
 
       return `
-        <article class="bg-slate-900 border ${cardBorderClass} rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3.5 shadow-md hover:border-slate-700 transition animate-card">
+        <article class="bg-slate-900 border ${cardBorderClass} rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-md hover:border-slate-700 transition animate-card">
           <div class="flex gap-3 sm:gap-3.5">
             <div class="relative w-[68px] h-[100px] sm:w-[76px] sm:h-[112px] rounded-xl overflow-hidden bg-slate-800 border border-slate-700/70 shrink-0">
               <img
@@ -1433,6 +1541,8 @@
               <div class="space-y-1">
                 <div class="flex flex-wrap items-center gap-1.5">
                   ${getTypeBadgeHtml(book.type)}
+                  ${genreBadgeHtml}
+                  ${starsHtml}
                   ${isNextActive ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">▶ En turno</span>` : ''}
                   ${isFutureQueued ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium">Siguiente en la cola</span>` : ''}
                 </div>
@@ -1448,13 +1558,17 @@
                     📚 ${escapeHtml(book.sagaName)} • Tomo #${book.sagaOrder || 1}
                   </p>
                 ` : ''}
+
+                ${datesHtml}
               </div>
 
               ${metricsHtml}
             </div>
           </div>
 
-          <!-- Barras de progreso (Doble barra independiente cuando hay páginas y capítulos) -->
+          ${notesHtml}
+
+          <!-- Barras de progreso -->
           <div class="space-y-1.5">
             <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80" title="Progreso de ${hasPages ? 'páginas' : 'capítulos'}: ${percent}%">
               <div class="h-full progress-bar-fill rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
