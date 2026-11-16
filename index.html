@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Google Identity Services & Google API -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js" async defer></script>
@@ -35,7 +37,6 @@
       overflow-x: hidden;
     }
 
-    /* Ocultar barra de desplazamiento en filtros horizontales móviles */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -44,7 +45,6 @@
       scrollbar-width: none;
     }
 
-    /* Transiciones suaves para tarjetas y progreso */
     .progress-bar-fill {
       transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.45s ease;
     }
@@ -71,11 +71,20 @@
     .animate-card {
       animation: fadeSlideUp 0.25s ease-out forwards;
     }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.95) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .animate-pop-in {
+      animation: popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
 
-  <!-- Toast / Notificación flotante (sin alert()) -->
+  <!-- Toast / Notificación flotante -->
   <div id="toastContainer" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Header Sticky Responsivo -->
@@ -121,7 +130,7 @@
             </button>
           </div>
 
-          <!-- Pill de usuario conectado (oculto por defecto) -->
+          <!-- Pill de usuario conectado -->
           <div id="connectedBar" class="hidden items-center gap-1.5 sm:gap-2 flex-wrap">
             <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs max-w-[190px] sm:max-w-[230px]">
               <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
@@ -200,7 +209,7 @@
           />
         </div>
 
-        <!-- Selector de Modo de Vista: Agrupado por Sagas vs Vista Individual -->
+        <!-- Selector de Modo de Vista -->
         <div class="inline-flex p-1 rounded-xl bg-slate-900 border border-slate-800 self-start sm:self-auto w-full sm:w-auto">
           <button
             id="btnViewGrouped"
@@ -225,7 +234,7 @@
         </div>
       </div>
 
-      <!-- Filtros horizontales deslizables (mobile-friendly) -->
+      <!-- Filtros horizontales deslizables -->
       <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
         <button onclick="setFilter('all')" data-filter="all" class="filter-pill shrink-0 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-semibold bg-indigo-600 text-white transition">
           Todos
@@ -255,87 +264,183 @@
 
   </main>
 
-  <!-- Modal para Agregar / Editar Lectura -->
-  <div id="bookModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-      <div class="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-slate-900/95 backdrop-blur border-b border-slate-800">
-        <h2 id="modalTitle" class="text-base sm:text-lg font-bold text-white">Nueva Lectura</h2>
-        <button onclick="closeBookModal()" class="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+  <!-- ===================================================================== -->
+  <!-- MODAL ENRIQUECIDO PARA AGREGAR / EDITAR LECTURA                       -->
+  <!-- ===================================================================== -->
+  <div id="bookModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-auto animate-pop-in">
+      <!-- Cabecera Modal -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 backdrop-blur">
+        <h2 id="modalTitle" class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="book-plus" class="w-5 h-5 text-indigo-400"></i>
+          <span>Registrar Nueva Lectura</span>
+        </h2>
+        <button onclick="closeBookModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="bookForm" onsubmit="saveBook(event)" class="p-4 sm:p-6 space-y-4">
+      <!-- Cuerpo Formulario -->
+      <form id="bookForm" onsubmit="saveBook(event)" class="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
         <input type="hidden" id="bookId" />
 
-        <!-- Título -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Título de la obra *</label>
-          <input id="bookTitle" type="text" required placeholder="Ej. El Imperio Final" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
-        </div>
+        <!-- Fila Superior: Portada + Datos Principales -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-5">
+          <!-- Columna Izquierda: Miniatura / Portada -->
+          <div class="sm:col-span-4 flex flex-col items-center">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 w-full text-center sm:text-left">Portada / Miniatura</label>
 
-        <!-- Tipo y Autor -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Formato *</label>
-            <select id="bookType" onchange="updateUnitLabels()" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none">
-              <option value="Libro">📚 Libro (Páginas)</option>
-              <option value="Cómic">💥 Cómic (Páginas)</option>
-              <option value="Manga">⛩️ Manga (Capítulos)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Autor / Mangaka</label>
-            <input id="bookAuthor" type="text" placeholder="Ej. Brandon Sanderson" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
-          </div>
-        </div>
-
-        <!-- Progreso Actual y Total -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label id="labelCurrentUnit" class="block text-xs font-semibold text-slate-300 mb-1.5">Páginas leídas</label>
-            <input id="bookCurrent" type="number" min="0" value="0" required class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
-          </div>
-          <div>
-            <label id="labelTotalUnit" class="block text-xs font-semibold text-slate-300 mb-1.5">Total de páginas *</label>
-            <input id="bookTotal" type="number" min="1" value="100" required class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
-          </div>
-        </div>
-
-        <!-- Sección de Saga / Serie -->
-        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-3">
-          <label class="flex items-center gap-3 cursor-pointer select-none min-h-[36px]">
-            <input id="bookIsSaga" type="checkbox" onchange="toggleSagaFields()" class="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 focus:ring-indigo-500" />
-            <span class="text-xs sm:text-sm font-semibold text-slate-200">Pertenece a una Saga o Serie</span>
-          </label>
-
-          <div id="sagaFieldsContainer" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-medium text-slate-400 mb-1">Nombre de la Saga *</label>
-              <input id="bookSagaName" list="existingSagasList" type="text" placeholder="Ej. Nacidos de la Bruma" class="w-full px-3 py-2.5 min-h-[42px] rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
-              <datalist id="existingSagasList"></datalist>
+            <!-- Vista previa de portada -->
+            <div id="cover-preview-box" class="w-36 h-52 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden relative group shadow-inner">
+              <img id="cover-preview-img" src="" alt="Vista previa" class="hidden w-full h-full object-cover" />
+              <div id="cover-preview-placeholder" class="flex flex-col items-center justify-center text-slate-500 p-3 text-center">
+                <i data-lucide="image-plus" class="w-8 h-8 mb-1.5 text-slate-600"></i>
+                <span class="text-[11px] leading-tight">Sin portada</span>
+              </div>
+              <button type="button" id="clear-cover-btn" onclick="clearCoverImage()" class="hidden absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600/90 text-white hover:bg-rose-500 shadow transition" title="Quitar imagen">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
+
+            <!-- Botón subir archivo -->
+            <label class="mt-3 w-36 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 cursor-pointer transition">
+              <i data-lucide="upload" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Subir imagen</span>
+              <input type="file" id="cover-file-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)" />
+            </label>
+
+            <!-- O URL de imagen -->
+            <input type="url" id="bookCover" oninput="handleCoverUrlInput(this.value)" placeholder="O pega URL de imagen..." class="mt-2 w-36 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- Columna Derecha: Título, Autor, Tipo y Saga -->
+          <div class="sm:col-span-8 space-y-4">
+            <!-- Nombre del título -->
             <div>
-              <label class="block text-xs font-medium text-slate-400 mb-1">Orden / Tomo #</label>
-              <input id="bookSagaOrder" type="number" min="1" value="1" class="w-full px-3 py-2.5 min-h-[42px] rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+              <label for="bookTitle" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Nombre del Título *</label>
+              <input type="text" id="bookTitle" required placeholder="Ej. El Imperio Final, Berserk Vol. 1, Watchmen..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
+            </div>
+
+            <!-- Autor / Mangaka -->
+            <div>
+              <label for="bookAuthor" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Autor / Mangaka</label>
+              <input type="text" id="bookAuthor" placeholder="Ej. Brandon Sanderson, Kentaro Miura..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
+            </div>
+
+            <!-- Tipo de obra con tarjetas seleccionables -->
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Tipo de Obra *</label>
+              <div class="grid grid-cols-3 gap-2.5">
+                <label class="cursor-pointer">
+                  <input type="radio" name="work-type" value="Libro" class="peer sr-only" checked onchange="updateFormLivePreview()" />
+                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-indigo-500 peer-checked:bg-indigo-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
+                    <i data-lucide="book" class="w-4 h-4 text-indigo-400"></i>
+                    <span>Libro</span>
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="work-type" value="Cómic" class="peer sr-only" onchange="updateFormLivePreview()" />
+                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-amber-500 peer-checked:bg-amber-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
+                    <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                    <span>Cómic</span>
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="work-type" value="Manga" class="peer sr-only" onchange="updateFormLivePreview()" />
+                  <div class="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 peer-checked:border-pink-500 peer-checked:bg-pink-500/15 text-center transition flex items-center justify-center gap-1.5 text-sm font-medium text-slate-300 peer-checked:text-white">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-pink-400"></i>
+                    <span>Manga</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Interruptor ¿Pertenece a una saga? -->
+            <div class="pt-1">
+              <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" id="bookIsSaga" onchange="toggleSagaFields()" class="sr-only peer" />
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                <span class="text-sm font-medium text-slate-200">¿Pertenece a una saga o serie?</span>
+              </label>
+            </div>
+
+            <!-- Campos condicionales de Saga -->
+            <div id="sagaFieldsContainer" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-indigo-500/30 animate-pop-in">
+              <div class="sm:col-span-2">
+                <label for="bookSagaName" class="block text-xs font-medium text-indigo-300 mb-1">Nombre de la Saga *</label>
+                <input type="text" id="bookSagaName" list="existingSagasList" placeholder="Ej. Nacidos de la Bruma" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                <datalist id="existingSagasList"></datalist>
+              </div>
+              <div>
+                <label for="bookSagaOrder" class="block text-xs font-medium text-indigo-300 mb-1"># Entrega *</label>
+                <input type="number" id="bookSagaOrder" min="1" step="1" value="1" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <p class="sm:col-span-3 text-[11px] text-slate-400">
+                La sugerencia diaria respetará el orden numérico de cada entrega de la saga.
+              </p>
             </div>
           </div>
         </div>
 
-        <!-- URL de Portada -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5">URL de Portada (opcional)</label>
-          <input id="bookCover" type="url" placeholder="https://ejemplo.com/portada.jpg" class="w-full px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 text-sm text-white outline-none" />
+        <!-- Sección de Progreso: Páginas y Capítulos + Vista Previa en Vivo -->
+        <div class="border-t border-slate-800 pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Contadores de Lectura</span>
+            <span id="form-live-percent" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">Progreso: 0%</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Bloque Páginas -->
+            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2.5">
+              <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <i data-lucide="file-text" class="w-4 h-4 text-sky-400"></i>
+                <span>Páginas</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label for="pages-read-input" class="block text-[11px] text-slate-400 mb-1">Leídas</label>
+                  <input type="number" id="pages-read-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div>
+                  <label for="pages-total-input" class="block text-[11px] text-slate-400 mb-1">Totales</label>
+                  <input type="number" id="pages-total-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-500" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Bloque Capítulos -->
+            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2.5">
+              <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <i data-lucide="bookmark" class="w-4 h-4 text-emerald-400"></i>
+                <span>Capítulos</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label for="chapters-read-input" class="block text-[11px] text-slate-400 mb-1">Leídos</label>
+                  <input type="number" id="chapters-read-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label for="chapters-total-input" class="block text-[11px] text-slate-400 mb-1">Totales</label>
+                  <input type="number" id="chapters-total-input" min="0" value="0" oninput="updateFormLivePreview()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista previa de la barra de color dinámico -->
+          <div class="mt-3">
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="form-live-bar" class="h-full progress-bar-fill rounded-full" style="width: 0%; background-color: hsl(0, 82%, 48%);"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Botones del Formulario -->
-        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
-          <button type="button" onclick="closeBookModal()" class="px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold transition">
+        <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeBookModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition cursor-pointer">
             Cancelar
           </button>
-          <button type="submit" class="px-5 py-2.5 min-h-[44px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/25 transition">
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-600/25 transition cursor-pointer">
             Guardar Lectura
           </button>
         </div>
@@ -370,7 +475,7 @@
     </div>
   </div>
 
-  <!-- Modal Confirmación de Eliminación (sin confirm()) -->
+  <!-- Modal Confirmación de Eliminación -->
   <div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-5 sm:p-6 space-y-4 shadow-2xl">
       <h3 class="text-base sm:text-lg font-bold text-white">¿Eliminar esta lectura?</h3>
@@ -386,6 +491,9 @@
     </div>
   </div>
 
+  <!-- Canvas oculto para redimensionar y comprimir miniaturas subidas -->
+  <canvas id="image-resizer-canvas" class="hidden"></canvas>
+
   <script>
     // =========================================================================
     // CONFIGURACIÓN DE GOOGLE OAUTH 2.0 Y GOOGLE SHEETS API
@@ -399,6 +507,7 @@
     const SPREADSHEET_TITLE = 'BiblioTrack_DB';
     const SHEET_NAME = 'Lecturas';
     const STORAGE_KEY = 'bibliotrack_books_v2';
+    const COVER_CACHE_KEY = 'bibliotrack_cover_cache_v1';
     const EXPANDED_SAGAS_KEY = 'bibliotrack_expanded_sagas';
 
     let tokenClient = null;
@@ -413,6 +522,7 @@
     let viewMode = 'grouped'; // 'grouped' | 'individual'
     let expandedSagas = new Set();
     let bookIdToDelete = null;
+    let currentBase64Cover = '';
 
     // =========================================================================
     // INICIALIZACIÓN Y DATOS DE EJEMPLO
@@ -421,88 +531,130 @@
       loadLocalData();
       renderLibrary();
       initGoogleScripts();
+      if (window.lucide) lucide.createIcons();
     });
+
+    function normalizeBookModel(raw) {
+      const type = raw.type || 'Libro';
+      const isManga = type === 'Manga';
+      const pagesTotal = raw.pagesTotal !== undefined ? Number(raw.pagesTotal) : (!isManga ? (Number(raw.total) || 0) : 0);
+      const pagesRead = raw.pagesRead !== undefined ? Number(raw.pagesRead) : (!isManga ? (Number(raw.current) || 0) : 0);
+      const chaptersTotal = raw.chaptersTotal !== undefined ? Number(raw.chaptersTotal) : (isManga ? (Number(raw.total) || 0) : 0);
+      const chaptersRead = raw.chaptersRead !== undefined ? Number(raw.chaptersRead) : (isManga ? (Number(raw.current) || 0) : 0);
+
+      // Compatibilidad con current / total para cálculos globales
+      const current = pagesTotal > 0 ? pagesRead : chaptersRead;
+      const total = Math.max(1, pagesTotal > 0 ? pagesTotal : (chaptersTotal > 0 ? chaptersTotal : (Number(raw.total) || 1)));
+
+      return {
+        id: raw.id || crypto.randomUUID(),
+        title: raw.title || 'Sin título',
+        type,
+        author: raw.author || '',
+        pagesRead: Math.max(0, pagesRead),
+        pagesTotal: Math.max(0, pagesTotal),
+        chaptersRead: Math.max(0, chaptersRead),
+        chaptersTotal: Math.max(0, chaptersTotal),
+        current,
+        total,
+        isSaga: Boolean(raw.isSaga),
+        sagaName: raw.sagaName || '',
+        sagaOrder: Math.max(1, Number(raw.sagaOrder) || 1),
+        cover: raw.cover || ''
+      };
+    }
 
     function loadLocalData() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-          books = JSON.parse(saved);
+          books = JSON.parse(saved).map(normalizeBookModel);
         } else {
-          // Datos iniciales de demostración con sagas y obras independientes
           books = [
-            {
+            normalizeBookModel({
               id: 'demo-1',
               title: 'El Imperio Final',
               type: 'Libro',
               author: 'Brandon Sanderson',
-              current: 688,
-              total: 688,
+              pagesRead: 688,
+              pagesTotal: 688,
+              chaptersRead: 38,
+              chaptersTotal: 38,
               isSaga: true,
               sagaName: 'Nacidos de la Bruma',
               sagaOrder: 1,
               cover: ''
-            },
-            {
+            }),
+            normalizeBookModel({
               id: 'demo-2',
               title: 'El Pozo de la Ascensión',
               type: 'Libro',
               author: 'Brandon Sanderson',
-              current: 310,
-              total: 800,
+              pagesRead: 310,
+              pagesTotal: 800,
+              chaptersRead: 24,
+              chaptersTotal: 59,
               isSaga: true,
               sagaName: 'Nacidos de la Bruma',
               sagaOrder: 2,
               cover: ''
-            },
-            {
+            }),
+            normalizeBookModel({
               id: 'demo-3',
               title: 'El Héroe de las Eras',
               type: 'Libro',
               author: 'Brandon Sanderson',
-              current: 0,
-              total: 760,
+              pagesRead: 0,
+              pagesTotal: 760,
+              chaptersRead: 0,
+              chaptersTotal: 82,
               isSaga: true,
               sagaName: 'Nacidos de la Bruma',
               sagaOrder: 3,
               cover: ''
-            },
-            {
+            }),
+            normalizeBookModel({
               id: 'demo-4',
               title: 'Chainsaw Man Vol. 1',
               type: 'Manga',
               author: 'Tatsuki Fujimoto',
-              current: 7,
-              total: 7,
+              pagesRead: 192,
+              pagesTotal: 192,
+              chaptersRead: 7,
+              chaptersTotal: 7,
               isSaga: true,
               sagaName: 'Chainsaw Man',
               sagaOrder: 1,
               cover: ''
-            },
-            {
+            }),
+            normalizeBookModel({
               id: 'demo-5',
               title: 'Chainsaw Man Vol. 2',
               type: 'Manga',
               author: 'Tatsuki Fujimoto',
-              current: 4,
-              total: 9,
+              pagesRead: 88,
+              pagesTotal: 192,
+              chaptersRead: 4,
+              chaptersTotal: 9,
               isSaga: true,
               sagaName: 'Chainsaw Man',
               sagaOrder: 2,
               cover: ''
-            },
-            {
+            }),
+            normalizeBookModel({
               id: 'demo-6',
               title: 'Proyecto Hail Mary',
               type: 'Libro',
               author: 'Andy Weir',
-              current: 195,
-              total: 528,
+              pagesRead: 195,
+              pagesTotal: 528,
+              chaptersRead: 12,
+              chaptersTotal: 30,
               isSaga: false,
               sagaName: '',
               sagaOrder: 1,
               cover: ''
-            }
+            })
           ];
           saveLocalData();
         }
@@ -526,8 +678,25 @@
       }
     }
 
+    function getCoverCache() {
+      try {
+        const raw = localStorage.getItem(COVER_CACHE_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveCoverToCache(id, base64Str) {
+      try {
+        const cache = getCoverCache();
+        cache[id] = base64Str;
+        localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
+      } catch (e) {}
+    }
+
     // =========================================================================
-    // GOOGLE IDENTITY SERVICES Y SHEETS SYNC
+    // GOOGLE IDENTITY SERVICES Y SHEETS SYNC (CON PORTADAS Y CAPÍTULOS)
     // =========================================================================
     function initGoogleScripts() {
       const checkInterval = setInterval(() => {
@@ -605,7 +774,6 @@
         console.warn('No se pudo obtener el perfil:', e);
       }
 
-      // Sincronizar y cargar automáticamente desde Google Sheets al conectar
       await syncWithGoogleSheets(true);
     }
 
@@ -634,14 +802,13 @@
 
       spreadsheetId = createRes.result.spreadsheetId;
 
-      // Escribir encabezados iniciales
       await gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${SHEET_NAME}!A1:J1`,
+        range: `${SHEET_NAME}!A1:L1`,
         valueInputOption: 'RAW',
         resource: {
           values: [[
-            'id', 'title', 'type', 'author', 'current', 'total', 'isSaga', 'sagaName', 'sagaOrder', 'cover'
+            'id', 'title', 'type', 'author', 'current', 'total', 'isSaga', 'sagaName', 'sagaOrder', 'cover', 'chaptersRead', 'chaptersTotal'
           ]]
         }
       });
@@ -660,23 +827,43 @@
         if (pullFirst) {
           const getRes = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: `${SHEET_NAME}!A2:J`
+            range: `${SHEET_NAME}!A2:L`
           });
 
           const rows = getRes.result.values || [];
           if (rows.length > 0) {
-            books = rows.map(r => ({
-              id: r[0] || crypto.randomUUID(),
-              title: r[1] || 'Sin título',
-              type: r[2] || 'Libro',
-              author: r[3] || '',
-              current: Number(r[4]) || 0,
-              total: Math.max(1, Number(r[5]) || 1),
-              isSaga: String(r[6]).toUpperCase() === 'TRUE',
-              sagaName: r[7] || '',
-              sagaOrder: Math.max(1, Number(r[8]) || 1),
-              cover: r[9] || ''
-            }));
+            const coverCache = getCoverCache();
+            books = rows.map(r => {
+              const id = r[0] || crypto.randomUUID();
+              const type = r[2] || 'Libro';
+              const isManga = type === 'Manga';
+              const colCurrent = Number(r[4]) || 0;
+              const colTotal = Number(r[5]) || 0;
+              const rawCover = (r[9] || '').trim();
+              const resolvedCover = rawCover.startsWith('LOCAL_CACHE:') ? (coverCache[id] || '') : rawCover;
+
+              const chaptersRead = r[10] !== undefined ? Number(r[10]) : (isManga ? colCurrent : 0);
+              const chaptersTotal = r[11] !== undefined ? Number(r[11]) : (isManga ? colTotal : 0);
+              const pagesRead = !isManga ? colCurrent : 0;
+              const pagesTotal = !isManga ? colTotal : 0;
+
+              return normalizeBookModel({
+                id,
+                title: r[1] || 'Sin título',
+                type,
+                author: r[3] || '',
+                pagesRead,
+                pagesTotal,
+                chaptersRead,
+                chaptersTotal,
+                current: colCurrent,
+                total: colTotal,
+                isSaga: String(r[6]).toUpperCase() === 'TRUE',
+                sagaName: r[7] || '',
+                sagaOrder: Math.max(1, Number(r[8]) || 1),
+                cover: resolvedCover
+              });
+            });
             saveLocalData();
             renderLibrary();
           } else if (books.length > 0) {
@@ -697,28 +884,40 @@
 
     async function pushAllToSheets(sheetId) {
       const targetId = sheetId || (await findOrCreateSpreadsheet());
-      const rows = books.map(b => [
-        b.id,
-        b.title,
-        b.type,
-        b.author || '',
-        b.current,
-        b.total,
-        b.isSaga ? 'TRUE' : 'FALSE',
-        b.sagaName || '',
-        b.sagaOrder || 1,
-        b.cover || ''
-      ]);
+      const rows = books.map(b => {
+        let sheetCoverValue = b.cover || '';
+        if (sheetCoverValue.startsWith('data:image')) {
+          saveCoverToCache(b.id, sheetCoverValue);
+          if (sheetCoverValue.length > 45000) {
+            sheetCoverValue = `LOCAL_CACHE:${b.id}`;
+          }
+        }
+
+        return [
+          b.id,
+          b.title,
+          b.type,
+          b.author || '',
+          b.current,
+          b.total,
+          b.isSaga ? 'TRUE' : 'FALSE',
+          b.sagaName || '',
+          b.sagaOrder || 1,
+          sheetCoverValue,
+          b.chaptersRead || 0,
+          b.chaptersTotal || 0
+        ];
+      });
 
       await gapi.client.sheets.spreadsheets.values.clear({
         spreadsheetId: targetId,
-        range: `${SHEET_NAME}!A2:J`
+        range: `${SHEET_NAME}!A2:L`
       });
 
       if (rows.length > 0) {
         await gapi.client.sheets.spreadsheets.values.update({
           spreadsheetId: targetId,
-          range: `${SHEET_NAME}!A2:J${rows.length + 1}`,
+          range: `${SHEET_NAME}!A2:L${rows.length + 1}`,
           valueInputOption: 'RAW',
           resource: { values: rows }
         });
@@ -732,12 +931,37 @@
       return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
 
+    function calculateBookProgress(book) {
+      const pTotal = Number(book.pagesTotal) || 0;
+      const pRead = Number(book.pagesRead) || 0;
+      const cTotal = Number(book.chaptersTotal) || 0;
+      const cRead = Number(book.chaptersRead) || 0;
+
+      if (pTotal > 0 && cTotal > 0) {
+        const isCompleted = pRead >= pTotal || cRead >= cTotal;
+        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100)));
+        return { percent, isCompleted };
+      }
+      if (pTotal > 0) {
+        const isCompleted = pRead >= pTotal;
+        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100)));
+        return { percent, isCompleted };
+      }
+      if (cTotal > 0) {
+        const isCompleted = cRead >= cTotal;
+        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((cRead / cTotal) * 100)));
+        return { percent, isCompleted };
+      }
+
+      const percent = getProgressPercentage(book.current, book.total);
+      return { percent, isCompleted: book.current >= book.total };
+    }
+
     function getProgressPercentage(current, total) {
       if (!total || total <= 0) return 0;
       return Math.min(100, Math.max(0, Math.round((current / total) * 100)));
     }
 
-    // Gradiente HSL dinámico: Rojo (0deg) -> Ámbar (45deg) -> Verde Esmeralda (142deg)
     function getProgressHslColor(percent) {
       const hue = Math.round((percent / 100) * 142);
       return `hsl(${hue}, 82%, 48%)`;
@@ -803,8 +1027,11 @@
     // =========================================================================
     function updateStats() {
       const total = books.length;
-      const completed = books.filter(b => b.current >= b.total).length;
-      const inProgress = books.filter(b => b.current > 0 && b.current < b.total).length;
+      const completed = books.filter(b => calculateBookProgress(b).isCompleted).length;
+      const inProgress = books.filter(b => {
+        const prog = calculateBookProgress(b);
+        return !prog.isCompleted && prog.percent > 0;
+      }).length;
       const uniqueSagas = new Set(
         books
           .filter(b => b.isSaga && normalizeSagaKey(b.sagaName))
@@ -821,11 +1048,11 @@
       const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
 
       return books.filter(book => {
-        const isCompleted = book.current >= book.total;
+        const { percent, isCompleted } = calculateBookProgress(book);
         if (currentFilter === 'Libro' && book.type !== 'Libro') return false;
         if (currentFilter === 'Cómic' && book.type !== 'Cómic') return false;
         if (currentFilter === 'Manga' && book.type !== 'Manga') return false;
-        if (currentFilter === 'in_progress' && (isCompleted || book.current === 0)) return false;
+        if (currentFilter === 'in_progress' && (isCompleted || percent === 0)) return false;
         if (currentFilter === 'completed' && !isCompleted) return false;
 
         if (q) {
@@ -887,7 +1114,6 @@
 
       let html = '';
 
-      // Sección de Sagas / Series Agrupadas
       if (sagaMap.size > 0) {
         html += `<div class="space-y-4">`;
         sagaMap.forEach(saga => {
@@ -896,7 +1122,6 @@
         html += `</div>`;
       }
 
-      // Sección de Lecturas Independientes
       if (standalones.length > 0) {
         html += `
           <div class="space-y-3">
@@ -912,28 +1137,23 @@
     }
 
     function renderSagaGroupCard(saga) {
-      // Ordenar estrictamente por sagaOrder ascendente
       const volumes = [...saga.volumes].sort((a, b) => (a.sagaOrder || 1) - (b.sagaOrder || 1));
       const totalVols = volumes.length;
-      const completedVols = volumes.filter(v => v.current >= v.total).length;
+      const completedVols = volumes.filter(v => calculateBookProgress(v).isCompleted).length;
 
-      // Progreso global basado en la suma de páginas/capítulos de toda la saga
       const totalUnits = volumes.reduce((acc, v) => acc + (v.total || 0), 0);
       const currentUnits = volumes.reduce((acc, v) => acc + Math.min(v.current || 0, v.total || 0), 0);
       const sagaPercent = getProgressPercentage(currentUnits, totalUnits);
       const barColor = getProgressHslColor(sagaPercent);
 
-      // Siguiente volumen pendiente (menor sagaOrder sin terminar)
-      const nextUnread = volumes.find(v => v.current < v.total) || null;
+      const nextUnread = volumes.find(v => !calculateBookProgress(v).isCompleted) || null;
       const isExpanded = expandedSagas.has(saga.key);
 
-      // Tipos únicos dentro de la saga
       const uniqueTypes = [...new Set(volumes.map(v => v.type))];
       const authors = [...new Set(volumes.map(v => v.author).filter(Boolean))];
 
       return `
         <div class="bg-slate-900/90 border ${isExpanded ? 'border-indigo-500/40' : 'border-slate-800/90'} rounded-2xl overflow-hidden shadow-lg transition animate-card">
-          <!-- Cabecera Clickable de la Saga -->
           <div
             onclick="toggleSagaExpand('${escapeHtml(saga.key)}')"
             role="button"
@@ -959,7 +1179,6 @@
                 ${authors.length > 0 ? `<p class="text-xs text-slate-400 truncate">${escapeHtml(authors.join(', '))}</p>` : ''}
               </div>
 
-              <!-- Porcentaje y Chevron -->
               <div class="flex items-center gap-2.5 shrink-0">
                 <div class="text-right">
                   <span class="text-sm sm:text-base font-extrabold text-white">${sagaPercent}%</span>
@@ -973,13 +1192,11 @@
               </div>
             </div>
 
-            <!-- Barra de Progreso Global de la Saga -->
             <div class="mt-3.5 space-y-2">
               <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
                 <div class="h-full progress-bar-fill rounded-full" style="width: ${sagaPercent}%; background-color: ${barColor};"></div>
               </div>
 
-              <!-- Badge del Siguiente Tomo Pendiente en Orden -->
               <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
                 ${nextUnread ? `
                   <div class="inline-flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-lg max-w-full">
@@ -999,13 +1216,12 @@
             </div>
           </div>
 
-          <!-- Lista Desplegable de Tomos Ordenados -->
           ${isExpanded ? `
             <div class="p-3.5 sm:p-5 pt-2 sm:pt-3 bg-slate-950/60 border-t border-slate-800/80">
               <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                 ${volumes.map(vol => {
                   const isNextActive = nextUnread && vol.id === nextUnread.id;
-                  const isFutureQueued = nextUnread && vol.current < vol.total && vol.id !== nextUnread.id;
+                  const isFutureQueued = nextUnread && !calculateBookProgress(vol).isCompleted && vol.id !== nextUnread.id;
                   return renderBookCard(vol, { isInsideSaga: true, isNextActive, isFutureQueued });
                 }).join('')}
               </div>
@@ -1017,13 +1233,11 @@
 
     function renderBookCard(book, options = {}) {
       const { isInsideSaga = false, isNextActive = false, isFutureQueued = false } = options;
-      const percent = getProgressPercentage(book.current, book.total);
-      const isCompleted = book.current >= book.total;
+      const { percent, isCompleted } = calculateBookProgress(book);
       const barColor = getProgressHslColor(percent);
       const unitShort = getUnitLabel(book.type, false);
       const unitPlural = getUnitLabel(book.type, true);
 
-      // Borde destacado para el tomo activo dentro de una saga
       let cardBorderClass = 'border-slate-800/90';
       if (isNextActive) {
         cardBorderClass = 'border-amber-500/60 ring-1 ring-amber-500/25';
@@ -1034,11 +1248,14 @@
       const fallbackCover = `https://placehold.co/136x200/1e293b/94a3b8?text=${encodeURIComponent(book.type)}`;
       const coverUrl = book.cover && book.cover.trim() ? book.cover.trim() : fallbackCover;
 
+      const hasBothMetrics = (book.pagesTotal > 0 && book.chaptersTotal > 0);
+      const progressLabelText = hasBothMetrics
+        ? `${book.pagesRead}/${book.pagesTotal} págs • ${book.chaptersRead}/${book.chaptersTotal} caps`
+        : `${book.current} / ${book.total} ${unitPlural}`;
+
       return `
         <article class="bg-slate-900 border ${cardBorderClass} rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3.5 shadow-md hover:border-slate-700 transition animate-card">
-          <!-- Parte Superior: Miniatura Responsiva + Metadatos -->
           <div class="flex gap-3 sm:gap-3.5">
-            <!-- Miniatura Compacta (68x100 en móvil) -->
             <div class="relative w-[68px] h-[100px] sm:w-[76px] sm:h-[112px] rounded-xl overflow-hidden bg-slate-800 border border-slate-700/70 shrink-0">
               <img
                 src="${escapeHtml(coverUrl)}"
@@ -1054,7 +1271,6 @@
               ` : ''}
             </div>
 
-            <!-- Información Principal -->
             <div class="min-w-0 flex-1 flex flex-col justify-between">
               <div class="space-y-1">
                 <div class="flex flex-wrap items-center gap-1.5">
@@ -1076,22 +1292,19 @@
                 ` : ''}
               </div>
 
-              <!-- Texto de Progreso -->
-              <div class="flex items-center justify-between text-xs pt-1.5">
-                <span class="font-semibold text-slate-300">
-                  ${book.current} / ${book.total} ${unitPlural}
+              <div class="flex items-center justify-between text-xs pt-1.5 gap-1">
+                <span class="font-semibold text-slate-300 truncate">
+                  ${progressLabelText}
                 </span>
-                <span class="font-extrabold" style="color: ${barColor};">${percent}%</span>
+                <span class="font-extrabold shrink-0" style="color: ${barColor};">${percent}%</span>
               </div>
             </div>
           </div>
 
-          <!-- Barra de Progreso Ancho Completo -->
           <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
             <div class="h-full progress-bar-fill rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
           </div>
 
-          <!-- Botones de Acción Táctiles (min-height 40px+) -->
           <div class="flex items-center justify-between gap-2 pt-0.5">
             <button
               onclick="incrementProgress('${book.id}', 1)"
@@ -1134,20 +1347,35 @@
     }
 
     // =========================================================================
-    // ACCIONES CRUD Y PROGRESO
+    // ACCIONES CRUD, SUBIDA DE PORTADA Y PROGRESO
     // =========================================================================
     async function incrementProgress(id, step) {
       const idx = books.findIndex(b => b.id === id);
       if (idx === -1) return;
 
       const book = books[idx];
-      if (book.current >= book.total) return;
+      if (calculateBookProgress(book).isCompleted) return;
 
-      book.current = Math.min(book.total, book.current + step);
+      if (book.type === 'Manga' && book.chaptersTotal > 0) {
+        book.chaptersRead = Math.min(book.chaptersTotal, (book.chaptersRead || 0) + step);
+        book.current = book.chaptersRead;
+        book.total = book.chaptersTotal;
+      } else if (book.pagesTotal > 0) {
+        book.pagesRead = Math.min(book.pagesTotal, (book.pagesRead || 0) + step);
+        book.current = book.pagesRead;
+        book.total = book.pagesTotal;
+      } else if (book.chaptersTotal > 0) {
+        book.chaptersRead = Math.min(book.chaptersTotal, (book.chaptersRead || 0) + step);
+        book.current = book.chaptersRead;
+        book.total = book.chaptersTotal;
+      } else {
+        book.current = Math.min(book.total, book.current + step);
+      }
+
       saveLocalData();
       renderLibrary();
 
-      if (book.current === book.total) {
+      if (calculateBookProgress(book).isCompleted) {
         showToast(`🎉 ¡Completaste "${book.title}"!`, 'success');
       }
 
@@ -1161,6 +1389,11 @@
       const form = document.getElementById('bookForm');
       form.reset();
 
+      currentBase64Cover = '';
+      document.getElementById('bookId').value = '';
+      document.getElementById('bookCover').value = '';
+      updateCoverPreviewUI('');
+
       // Rellenar sugerencias de sagas existentes
       const datalist = document.getElementById('existingSagasList');
       const uniqueSagaNames = [...new Set(books.filter(b => b.isSaga && b.sagaName).map(b => b.sagaName.trim()))];
@@ -1169,29 +1402,44 @@
       if (editId) {
         const book = books.find(b => b.id === editId);
         if (!book) return;
-        document.getElementById('modalTitle').textContent = 'Editar Lectura';
+        document.getElementById('modalTitle').innerHTML = `<i data-lucide="pencil" class="w-5 h-5 text-indigo-400"></i><span>Editar Lectura</span>`;
         document.getElementById('bookId').value = book.id;
         document.getElementById('bookTitle').value = book.title;
-        document.getElementById('bookType').value = book.type;
         document.getElementById('bookAuthor').value = book.author || '';
-        document.getElementById('bookCurrent').value = book.current;
-        document.getElementById('bookTotal').value = book.total;
+
+        const typeRadio = document.querySelector(`input[name="work-type"][value="${book.type}"]`);
+        if (typeRadio) typeRadio.checked = true;
+
+        document.getElementById('pages-read-input').value = book.pagesRead || 0;
+        document.getElementById('pages-total-input').value = book.pagesTotal || 0;
+        document.getElementById('chapters-read-input').value = book.chaptersRead || 0;
+        document.getElementById('chapters-total-input').value = book.chaptersTotal || 0;
+
         document.getElementById('bookIsSaga').checked = Boolean(book.isSaga);
         document.getElementById('bookSagaName').value = book.sagaName || '';
         document.getElementById('bookSagaOrder').value = book.sagaOrder || 1;
-        document.getElementById('bookCover').value = book.cover || '';
+
+        if (book.cover) {
+          if (book.cover.startsWith('data:image')) {
+            currentBase64Cover = book.cover;
+            updateCoverPreviewUI(book.cover);
+          } else {
+            document.getElementById('bookCover').value = book.cover;
+            updateCoverPreviewUI(book.cover);
+          }
+        }
       } else {
-        document.getElementById('modalTitle').textContent = 'Nueva Lectura';
-        document.getElementById('bookId').value = '';
+        document.getElementById('modalTitle').innerHTML = `<i data-lucide="book-plus" class="w-5 h-5 text-indigo-400"></i><span>Registrar Nueva Lectura</span>`;
         document.getElementById('bookIsSaga').checked = false;
         document.getElementById('bookSagaOrder').value = 1;
       }
 
-      updateUnitLabels();
       toggleSagaFields();
+      updateFormLivePreview();
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
     }
 
     function closeBookModal() {
@@ -1200,26 +1448,131 @@
       modal.classList.remove('flex');
     }
 
-    function updateUnitLabels() {
-      const type = document.getElementById('bookType').value;
-      const isManga = type === 'Manga';
-      document.getElementById('labelCurrentUnit').textContent = isManga ? 'Capítulos leídos' : 'Páginas leídas';
-      document.getElementById('labelTotalUnit').textContent = isManga ? 'Total de capítulos *' : 'Total de páginas *';
-    }
-
     function toggleSagaFields() {
       const isSaga = document.getElementById('bookIsSaga').checked;
       const container = document.getElementById('sagaFieldsContainer');
       const sagaNameInput = document.getElementById('bookSagaName');
+      const sagaOrderInput = document.getElementById('bookSagaOrder');
 
       if (isSaga) {
         container.classList.remove('hidden');
         container.classList.add('grid');
         sagaNameInput.required = true;
+        sagaOrderInput.required = true;
       } else {
         container.classList.add('hidden');
         container.classList.remove('grid');
         sagaNameInput.required = false;
+        sagaOrderInput.required = false;
+      }
+    }
+
+    function updateFormLivePreview() {
+      const tempBook = {
+        pagesRead: Number(document.getElementById('pages-read-input').value) || 0,
+        pagesTotal: Number(document.getElementById('pages-total-input').value) || 0,
+        chaptersRead: Number(document.getElementById('chapters-read-input').value) || 0,
+        chaptersTotal: Number(document.getElementById('chapters-total-input').value) || 0,
+      };
+      const { percent } = calculateBookProgress(tempBook);
+      const color = getProgressHslColor(percent);
+
+      const badge = document.getElementById('form-live-percent');
+      const bar = document.getElementById('form-live-bar');
+
+      badge.textContent = `Progreso: ${percent}%`;
+      badge.style.color = color;
+      bar.style.width = `${percent}%`;
+      bar.style.backgroundColor = color;
+    }
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        showToast('Por favor selecciona un archivo de imagen válido.', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+          const canvas = document.getElementById('image-resizer-canvas');
+          const ctx = canvas.getContext('2d');
+
+          const MAX_W = 160;
+          const MAX_H = 240;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_W) {
+              height = Math.round((height * MAX_W) / width);
+              width = MAX_W;
+            }
+          } else {
+            if (height > MAX_H) {
+              width = Math.round((width * MAX_H) / height);
+              height = MAX_H;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          let quality = 0.72;
+          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          while (compressedBase64.length > 42000 && quality > 0.25) {
+            quality -= 0.1;
+            compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          }
+
+          currentBase64Cover = compressedBase64;
+          document.getElementById('bookCover').value = '';
+          updateCoverPreviewUI(compressedBase64);
+          showToast('Portada optimizada lista para guardar.', 'success');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleCoverUrlInput(url) {
+      const trimmed = url.trim();
+      if (trimmed) {
+        currentBase64Cover = '';
+        updateCoverPreviewUI(trimmed);
+      } else if (!currentBase64Cover) {
+        updateCoverPreviewUI('');
+      }
+    }
+
+    function clearCoverImage() {
+      currentBase64Cover = '';
+      document.getElementById('cover-file-input').value = '';
+      document.getElementById('bookCover').value = '';
+      updateCoverPreviewUI('');
+    }
+
+    function updateCoverPreviewUI(src) {
+      const imgEl = document.getElementById('cover-preview-img');
+      const placeholderEl = document.getElementById('cover-preview-placeholder');
+      const clearBtn = document.getElementById('clear-cover-btn');
+
+      if (src) {
+        imgEl.src = src;
+        imgEl.classList.remove('hidden');
+        placeholderEl.classList.add('hidden');
+        clearBtn.classList.remove('hidden');
+      } else {
+        imgEl.src = '';
+        imgEl.classList.add('hidden');
+        placeholderEl.classList.remove('hidden');
+        clearBtn.classList.add('hidden');
       }
     }
 
@@ -1228,27 +1581,39 @@
 
       const id = document.getElementById('bookId').value;
       const title = document.getElementById('bookTitle').value.trim();
-      const type = document.getElementById('bookType').value;
+      const type = document.querySelector('input[name="work-type"]:checked').value;
       const author = document.getElementById('bookAuthor').value.trim();
-      const total = Math.max(1, parseInt(document.getElementById('bookTotal').value, 10) || 1);
-      const current = Math.min(total, Math.max(0, parseInt(document.getElementById('bookCurrent').value, 10) || 0));
+
+      const pagesRead = Math.max(0, parseInt(document.getElementById('pages-read-input').value, 10) || 0);
+      const pagesTotal = Math.max(0, parseInt(document.getElementById('pages-total-input').value, 10) || 0);
+      const chaptersRead = Math.max(0, parseInt(document.getElementById('chapters-read-input').value, 10) || 0);
+      const chaptersTotal = Math.max(0, parseInt(document.getElementById('chapters-total-input').value, 10) || 0);
+
       const isSaga = document.getElementById('bookIsSaga').checked;
       const sagaName = isSaga ? document.getElementById('bookSagaName').value.trim() : '';
       const sagaOrder = isSaga ? Math.max(1, parseInt(document.getElementById('bookSagaOrder').value, 10) || 1) : 1;
-      const cover = document.getElementById('bookCover').value.trim();
 
-      const payload = {
+      const urlCover = document.getElementById('bookCover').value.trim();
+      const cover = currentBase64Cover || urlCover || '';
+
+      const payload = normalizeBookModel({
         id: id || crypto.randomUUID(),
         title,
         type,
         author,
-        current,
-        total,
+        pagesRead,
+        pagesTotal,
+        chaptersRead,
+        chaptersTotal,
         isSaga: isSaga && Boolean(sagaName),
         sagaName,
         sagaOrder,
         cover
-      };
+      });
+
+      if (payload.cover && payload.cover.startsWith('data:image')) {
+        saveCoverToCache(payload.id, payload.cover);
+      }
 
       if (id) {
         const idx = books.findIndex(b => b.id === id);
@@ -1300,14 +1665,14 @@
     }
 
     // =========================================================================
-    // LECTURA DEL DÍA (SOLO INDEPENDIENTES PENDIENTES O PRIMER TOMO PENDIENTE DE SAGA)
+    // LECTURA DEL DÍA
     // =========================================================================
     function pickDailyRead() {
       const candidates = [];
       const sagaFirstUnreadMap = new Map();
 
       books.forEach(book => {
-        if (book.current >= book.total) return; // Ignorar completados
+        if (calculateBookProgress(book).isCompleted) return;
 
         const normKey = book.isSaga ? normalizeSagaKey(book.sagaName) : '';
         if (normKey) {
@@ -1328,7 +1693,7 @@
       }
 
       const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      const percent = getProgressPercentage(chosen.current, chosen.total);
+      const { percent } = calculateBookProgress(chosen);
       const unitPlural = getUnitLabel(chosen.type, true);
 
       document.getElementById('dailyBookTitle').textContent = chosen.title;
@@ -1352,7 +1717,7 @@
     }
 
     // =========================================================================
-    // UTILIDADES UI (TOASTS Y ESCAPE HTML)
+    // UTILIDADES UI
     // =========================================================================
     function showToast(message, type = 'info') {
       const container = document.getElementById('toastContainer');
