@@ -279,7 +279,34 @@
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-
+      <!-- Género y Calificación -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="bookGenre" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Género / Categoría</label>
+                <input type="text" id="bookGenre" list="existingGenresList" placeholder="Ej. Terror, Fantasía, Sci-Fi..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition" />
+                <datalist id="existingGenresList">
+                  <option value="Terror"></option>
+                  <option value="Ciencia Ficción"></option>
+                  <option value="Fantasía"></option>
+                  <option value="Misterio / Thriller"></option>
+                  <option value="Seinen"></option>
+                  <option value="Shonen"></option>
+                  <option value="Superhéroes"></option>
+                  <option value="Drama / Psicológico"></option>
+                </datalist>
+              </div>
+              <div>
+                <label for="bookRating" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Calificación</label>
+                <select id="bookRating" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                  <option value="0">Sin calificar</option>
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                  <option value="3">⭐⭐⭐ (3/5)</option>
+                  <option value="2">⭐⭐ (2/5)</option>
+                  <option value="1">⭐ (1/5)</option>
+                </select>
+              </div>
+            </div>
       <!-- Cuerpo Formulario -->
       <form id="bookForm" onsubmit="saveBook(event)" class="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
         <input type="hidden" id="bookId" />
@@ -434,7 +461,25 @@
             </div>
           </div>
         </div>
-
+        
+        <!-- Fechas de Lectura y Notas -->
+        <div class="border-t border-slate-800 pt-4 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="bookStartDate" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Fecha de Inicio (opcional)</label>
+              <input type="date" id="bookStartDate" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 [color-scheme:dark]" />
+            </div>
+            <div>
+              <label for="bookEndDate" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Fecha de Finalización (opcional)</label>
+              <input type="date" id="bookEndDate" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 [color-scheme:dark]" />
+            </div>
+          </div>
+          <div>
+            <label for="bookNotes" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Notas o Reseña Breve</label>
+            <textarea id="bookNotes" rows="2" placeholder="Tus impresiones, frase favorita o en qué volumen quedaste..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+          </div>
+        </div>
+        
         <!-- Botones del Formulario -->
         <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
           <button type="button" onclick="closeBookModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition cursor-pointer">
@@ -542,7 +587,6 @@
       const chaptersTotal = raw.chaptersTotal !== undefined ? Number(raw.chaptersTotal) : (isManga ? (Number(raw.total) || 0) : 0);
       const chaptersRead = raw.chaptersRead !== undefined ? Number(raw.chaptersRead) : (isManga ? (Number(raw.current) || 0) : 0);
 
-      // Compatibilidad con current / total para cálculos globales de saga
       const current = pagesTotal > 0 ? pagesRead : chaptersRead;
       const total = Math.max(1, pagesTotal > 0 ? pagesTotal : (chaptersTotal > 0 ? chaptersTotal : (Number(raw.total) || 1)));
 
@@ -551,6 +595,11 @@
         title: raw.title || 'Sin título',
         type,
         author: raw.author || '',
+        genre: raw.genre || '',
+        rating: Math.min(5, Math.max(0, Number(raw.rating) || 0)),
+        startDate: raw.startDate || '',
+        endDate: raw.endDate || '',
+        notes: raw.notes || '',
         pagesRead: Math.max(0, pagesRead),
         pagesTotal: Math.max(0, pagesTotal),
         chaptersRead: Math.max(0, chaptersRead),
@@ -804,11 +853,11 @@
 
       await gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${SHEET_NAME}!A1:L1`,
+        range: `${SHEET_NAME}!A1:Q1`,
         valueInputOption: 'RAW',
         resource: {
           values: [[
-            'id', 'title', 'type', 'author', 'current', 'total', 'isSaga', 'sagaName', 'sagaOrder', 'cover', 'chaptersRead', 'chaptersTotal'
+            'id', 'title', 'type', 'author', 'current', 'total', 'isSaga', 'sagaName', 'sagaOrder', 'cover', 'chaptersRead', 'chaptersTotal', 'genre', 'rating', 'startDate', 'endDate', 'notes'
           ]]
         }
       });
@@ -827,7 +876,7 @@
         if (pullFirst) {
           const getRes = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: `${SHEET_NAME}!A2:L`
+            range: `${SHEET_NAME}!A2:Q`
           });
 
           const rows = getRes.result.values || [];
@@ -861,7 +910,12 @@
                 isSaga: String(r[6]).toUpperCase() === 'TRUE',
                 sagaName: r[7] || '',
                 sagaOrder: Math.max(1, Number(r[8]) || 1),
-                cover: resolvedCover
+                cover: resolvedCover,
+                genre: r[12] || '',
+                rating: Number(r[13]) || 0,
+                startDate: r[14] || '',
+                endDate: r[15] || '',
+                notes: r[16] || ''
               });
             });
             saveLocalData();
@@ -881,7 +935,7 @@
         syncIcon.classList.remove('animate-spin');
       }
     }
-
+    
     async function pushAllToSheets(sheetId) {
       const targetId = sheetId || (await findOrCreateSpreadsheet());
       const rows = books.map(b => {
@@ -905,19 +959,24 @@
           b.sagaOrder || 1,
           sheetCoverValue,
           b.chaptersRead || 0,
-          b.chaptersTotal || 0
+          b.chaptersTotal || 0,
+          b.genre || '',
+          b.rating || 0,
+          b.startDate || '',
+          b.endDate || '',
+          b.notes || ''
         ];
       });
 
       await gapi.client.sheets.spreadsheets.values.clear({
         spreadsheetId: targetId,
-        range: `${SHEET_NAME}!A2:L`
+        range: `${SHEET_NAME}!A2:Q`
       });
 
       if (rows.length > 0) {
         await gapi.client.sheets.spreadsheets.values.update({
           spreadsheetId: targetId,
-          range: `${SHEET_NAME}!A2:L${rows.length + 1}`,
+          range: `${SHEET_NAME}!A2:Q${rows.length + 1}`,
           valueInputOption: 'RAW',
           resource: { values: rows }
         });
@@ -1502,7 +1561,12 @@
         document.getElementById('bookId').value = book.id;
         document.getElementById('bookTitle').value = book.title;
         document.getElementById('bookAuthor').value = book.author || '';
-
+        document.getElementById('bookGenre').value = book.genre || '';
+        document.getElementById('bookRating').value = book.rating || 0;
+        document.getElementById('bookStartDate').value = book.startDate || '';
+        document.getElementById('bookEndDate').value = book.endDate || '';
+        document.getElementById('bookNotes').value = book.notes || '';
+        
         const typeRadio = document.querySelector(`input[name="work-type"][value="${book.type}"]`);
         if (typeRadio) typeRadio.checked = true;
 
@@ -1692,6 +1756,12 @@
       const urlCover = document.getElementById('bookCover').value.trim();
       const cover = currentBase64Cover || urlCover || '';
 
+      const genre = document.getElementById('bookGenre').value.trim();
+      const rating = parseInt(document.getElementById('bookRating').value, 10) || 0;
+      const startDate = document.getElementById('bookStartDate').value;
+      const endDate = document.getElementById('bookEndDate').value;
+      const notes = document.getElementById('bookNotes').value.trim();
+      
       const payload = normalizeBookModel({
         id: id || crypto.randomUUID(),
         title,
@@ -1701,6 +1771,11 @@
         pagesTotal,
         chaptersRead,
         chaptersTotal,
+        genre,
+        rating,
+        starDate,
+        endDate,
+        notes,
         isSaga: isSaga && Boolean(sagaName),
         sagaName,
         sagaOrder,
