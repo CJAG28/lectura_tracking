@@ -385,7 +385,7 @@
         <!-- Sección de Progreso: Páginas y Capítulos + Vista Previa en Vivo -->
         <div class="border-t border-slate-800 pt-4">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Contadores de Lectura</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Contadores Independientes de Lectura</span>
             <span id="form-live-percent" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">Progreso: 0%</span>
           </div>
 
@@ -542,7 +542,7 @@
       const chaptersTotal = raw.chaptersTotal !== undefined ? Number(raw.chaptersTotal) : (isManga ? (Number(raw.total) || 0) : 0);
       const chaptersRead = raw.chaptersRead !== undefined ? Number(raw.chaptersRead) : (isManga ? (Number(raw.current) || 0) : 0);
 
-      // Compatibilidad con current / total para cálculos globales
+      // Compatibilidad con current / total para cálculos globales de saga
       const current = pagesTotal > 0 ? pagesRead : chaptersRead;
       const total = Math.max(1, pagesTotal > 0 ? pagesTotal : (chaptersTotal > 0 ? chaptersTotal : (Number(raw.total) || 1)));
 
@@ -937,24 +937,27 @@
       const cTotal = Number(book.chaptersTotal) || 0;
       const cRead = Number(book.chaptersRead) || 0;
 
+      const pagePercent = pTotal > 0 ? Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100))) : 0;
+      const chapterPercent = cTotal > 0 ? Math.min(100, Math.max(0, Math.round((cRead / cTotal) * 100))) : 0;
+
       if (pTotal > 0 && cTotal > 0) {
-        const isCompleted = pRead >= pTotal || cRead >= cTotal;
-        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100)));
-        return { percent, isCompleted };
+        const isCompleted = pRead >= pTotal && cRead >= cTotal;
+        const percent = isCompleted ? 100 : pagePercent;
+        return { percent, pagePercent, chapterPercent, isCompleted };
       }
       if (pTotal > 0) {
         const isCompleted = pRead >= pTotal;
-        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((pRead / pTotal) * 100)));
-        return { percent, isCompleted };
+        const percent = isCompleted ? 100 : pagePercent;
+        return { percent, pagePercent, chapterPercent: 0, isCompleted };
       }
       if (cTotal > 0) {
         const isCompleted = cRead >= cTotal;
-        const percent = isCompleted ? 100 : Math.min(100, Math.max(0, Math.round((cRead / cTotal) * 100)));
-        return { percent, isCompleted };
+        const percent = isCompleted ? 100 : chapterPercent;
+        return { percent, pagePercent: 0, chapterPercent, isCompleted };
       }
 
       const percent = getProgressPercentage(book.current, book.total);
-      return { percent, isCompleted: book.current >= book.total };
+      return { percent, pagePercent: percent, chapterPercent: 0, isCompleted: book.current >= book.total };
     }
 
     function getProgressPercentage(current, total) {
@@ -1030,7 +1033,7 @@
       const completed = books.filter(b => calculateBookProgress(b).isCompleted).length;
       const inProgress = books.filter(b => {
         const prog = calculateBookProgress(b);
-        return !prog.isCompleted && prog.percent > 0;
+        return !prog.isCompleted && (prog.percent > 0 || (b.chaptersRead || 0) > 0 || (b.pagesRead || 0) > 0);
       }).length;
       const uniqueSagas = new Set(
         books
@@ -1049,10 +1052,11 @@
 
       return books.filter(book => {
         const { percent, isCompleted } = calculateBookProgress(book);
+        const started = percent > 0 || (book.chaptersRead || 0) > 0 || (book.pagesRead || 0) > 0;
         if (currentFilter === 'Libro' && book.type !== 'Libro') return false;
         if (currentFilter === 'Cómic' && book.type !== 'Cómic') return false;
         if (currentFilter === 'Manga' && book.type !== 'Manga') return false;
-        if (currentFilter === 'in_progress' && (isCompleted || percent === 0)) return false;
+        if (currentFilter === 'in_progress' && (isCompleted || !started)) return false;
         if (currentFilter === 'completed' && !isCompleted) return false;
 
         if (q) {
@@ -1233,10 +1237,21 @@
 
     function renderBookCard(book, options = {}) {
       const { isInsideSaga = false, isNextActive = false, isFutureQueued = false } = options;
-      const { percent, isCompleted } = calculateBookProgress(book);
+      const { percent, pagePercent, chapterPercent, isCompleted } = calculateBookProgress(book);
       const barColor = getProgressHslColor(percent);
-      const unitShort = getUnitLabel(book.type, false);
-      const unitPlural = getUnitLabel(book.type, true);
+      const chapterBarColor = getProgressHslColor(chapterPercent);
+
+      const pTotal = Number(book.pagesTotal) || 0;
+      const pRead = Number(book.pagesRead) || 0;
+      const cTotal = Number(book.chaptersTotal) || 0;
+      const cRead = Number(book.chaptersRead) || 0;
+
+      const hasPages = pTotal > 0;
+      const hasChapters = cTotal > 0;
+      const hasBothMetrics = hasPages && hasChapters;
+
+      const pagesFinished = hasPages && pRead >= pTotal;
+      const chaptersFinished = hasChapters && cRead >= cTotal;
 
       let cardBorderClass = 'border-slate-800/90';
       if (isNextActive) {
@@ -1248,10 +1263,94 @@
       const fallbackCover = `https://placehold.co/136x200/1e293b/94a3b8?text=${encodeURIComponent(book.type)}`;
       const coverUrl = book.cover && book.cover.trim() ? book.cover.trim() : fallbackCover;
 
-      const hasBothMetrics = (book.pagesTotal > 0 && book.chaptersTotal > 0);
-      const progressLabelText = hasBothMetrics
-        ? `${book.pagesRead}/${book.pagesTotal} págs • ${book.chaptersRead}/${book.chaptersTotal} caps`
-        : `${book.current} / ${book.total} ${unitPlural}`;
+      // Texto de contadores independientes
+      let metricsHtml = '';
+      if (hasBothMetrics) {
+        metricsHtml = `
+          <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px] pt-1.5">
+            <span class="font-semibold text-sky-300">📄 ${pRead}/${pTotal} págs <span class="text-slate-400">(${pagePercent}%)</span></span>
+            <span class="font-semibold text-emerald-300">🔖 ${cRead}/${cTotal} caps <span class="text-slate-400">(${chapterPercent}%)</span></span>
+          </div>
+        `;
+      } else if (hasPages) {
+        metricsHtml = `
+          <div class="flex items-center justify-between text-xs pt-1.5 gap-1">
+            <span class="font-semibold text-slate-300">📄 ${pRead} / ${pTotal} págs</span>
+            <span class="font-extrabold shrink-0" style="color: ${barColor};">${pagePercent}%</span>
+          </div>
+        `;
+      } else if (hasChapters) {
+        metricsHtml = `
+          <div class="flex items-center justify-between text-xs pt-1.5 gap-1">
+            <span class="font-semibold text-slate-300">🔖 ${cRead} / ${cTotal} caps</span>
+            <span class="font-extrabold shrink-0" style="color: ${chapterBarColor};">${chapterPercent}%</span>
+          </div>
+        `;
+      } else {
+        metricsHtml = `
+          <div class="flex items-center justify-between text-xs pt-1.5 gap-1">
+            <span class="font-semibold text-slate-300">${book.current} / ${book.total}</span>
+            <span class="font-extrabold shrink-0" style="color: ${barColor};">${percent}%</span>
+          </div>
+        `;
+      }
+
+      // Botones independientes (+1 Pág y +1 Cap)
+      let incrementButtonsHtml = '';
+      if (isCompleted) {
+        incrementButtonsHtml = `
+          <button disabled class="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 min-h-[42px] rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default">
+            ✅ Completado
+          </button>
+        `;
+      } else if (hasBothMetrics) {
+        incrementButtonsHtml = `
+          <div class="flex-1 grid grid-cols-2 gap-1.5">
+            <button
+              onclick="incrementMetric('${book.id}', 'pages', 1)"
+              ${pagesFinished ? 'disabled' : ''}
+              title="${pagesFinished ? 'Páginas completadas' : 'Sumar 1 página leída'}"
+              class="inline-flex items-center justify-center gap-1 px-2 py-2 min-h-[42px] rounded-xl text-xs font-bold transition ${
+                pagesFinished
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default'
+                  : 'bg-sky-600/20 hover:bg-sky-600/35 border border-sky-500/40 text-sky-200 active:scale-[0.98]'
+              }"
+            >
+              ${pagesFinished ? '✓ Págs' : '+1 Pág'}
+            </button>
+            <button
+              onclick="incrementMetric('${book.id}', 'chapters', 1)"
+              ${chaptersFinished ? 'disabled' : ''}
+              title="${chaptersFinished ? 'Capítulos completados' : 'Sumar 1 capítulo leído'}"
+              class="inline-flex items-center justify-center gap-1 px-2 py-2 min-h-[42px] rounded-xl text-xs font-bold transition ${
+                chaptersFinished
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm active:scale-[0.98]'
+              }"
+            >
+              ${chaptersFinished ? '✓ Caps' : '+1 Cap'}
+            </button>
+          </div>
+        `;
+      } else if (hasChapters && !hasPages) {
+        incrementButtonsHtml = `
+          <button
+            onclick="incrementMetric('${book.id}', 'chapters', 1)"
+            class="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 min-h-[42px] rounded-xl text-xs font-bold transition bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white shadow-sm"
+          >
+            +1 Cap
+          </button>
+        `;
+      } else {
+        incrementButtonsHtml = `
+          <button
+            onclick="incrementMetric('${book.id}', 'pages', 1)"
+            class="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 min-h-[42px] rounded-xl text-xs font-bold transition bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white shadow-sm"
+          >
+            +1 Pág
+          </button>
+        `;
+      }
 
       return `
         <article class="bg-slate-900 border ${cardBorderClass} rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3.5 shadow-md hover:border-slate-700 transition animate-card">
@@ -1292,31 +1391,25 @@
                 ` : ''}
               </div>
 
-              <div class="flex items-center justify-between text-xs pt-1.5 gap-1">
-                <span class="font-semibold text-slate-300 truncate">
-                  ${progressLabelText}
-                </span>
-                <span class="font-extrabold shrink-0" style="color: ${barColor};">${percent}%</span>
-              </div>
+              ${metricsHtml}
             </div>
           </div>
 
-          <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
-            <div class="h-full progress-bar-fill rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
+          <!-- Barras de progreso (Doble barra independiente cuando hay páginas y capítulos) -->
+          <div class="space-y-1.5">
+            <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80" title="Progreso de ${hasPages ? 'páginas' : 'capítulos'}: ${percent}%">
+              <div class="h-full progress-bar-fill rounded-full" style="width: ${percent}%; background-color: ${barColor};"></div>
+            </div>
+            ${hasBothMetrics ? `
+              <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/60" title="Progreso de capítulos: ${chapterPercent}%">
+                <div class="h-full progress-bar-fill rounded-full" style="width: ${chapterPercent}%; background-color: ${chapterBarColor};"></div>
+              </div>
+            ` : ''}
           </div>
 
+          <!-- Controles de acción independientes -->
           <div class="flex items-center justify-between gap-2 pt-0.5">
-            <button
-              onclick="incrementProgress('${book.id}', 1)"
-              ${isCompleted ? 'disabled' : ''}
-              class="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 min-h-[42px] rounded-xl text-xs font-bold transition ${
-                isCompleted
-                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default'
-                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white shadow-sm'
-              }"
-            >
-              ${isCompleted ? '✅ Completado' : `+1 ${unitShort}`}
-            </button>
+            ${incrementButtonsHtml}
 
             <div class="flex items-center gap-1.5 shrink-0">
               <button
@@ -1347,35 +1440,38 @@
     }
 
     // =========================================================================
-    // ACCIONES CRUD, SUBIDA DE PORTADA Y PROGRESO
+    // ACCIONES CRUD, INCREMENTO INDEPENDIENTE Y SUBIDA DE PORTADA
     // =========================================================================
-    async function incrementProgress(id, step) {
+    async function incrementMetric(id, metric, step) {
       const idx = books.findIndex(b => b.id === id);
       if (idx === -1) return;
 
       const book = books[idx];
-      if (calculateBookProgress(book).isCompleted) return;
+      const wasCompleted = calculateBookProgress(book).isCompleted;
 
-      if (book.type === 'Manga' && book.chaptersTotal > 0) {
-        book.chaptersRead = Math.min(book.chaptersTotal, (book.chaptersRead || 0) + step);
-        book.current = book.chaptersRead;
-        book.total = book.chaptersTotal;
-      } else if (book.pagesTotal > 0) {
-        book.pagesRead = Math.min(book.pagesTotal, (book.pagesRead || 0) + step);
-        book.current = book.pagesRead;
-        book.total = book.pagesTotal;
-      } else if (book.chaptersTotal > 0) {
-        book.chaptersRead = Math.min(book.chaptersTotal, (book.chaptersRead || 0) + step);
-        book.current = book.chaptersRead;
-        book.total = book.chaptersTotal;
-      } else {
-        book.current = Math.min(book.total, book.current + step);
+      if (metric === 'pages') {
+        if (book.pagesTotal > 0) {
+          book.pagesRead = Math.min(book.pagesTotal, (book.pagesRead || 0) + step);
+          book.current = book.pagesRead;
+          book.total = book.pagesTotal;
+        } else {
+          book.current = Math.min(book.total, (book.current || 0) + step);
+          book.pagesRead = book.current;
+        }
+      } else if (metric === 'chapters') {
+        if (book.chaptersTotal > 0) {
+          book.chaptersRead = Math.min(book.chaptersTotal, (book.chaptersRead || 0) + step);
+          if (book.pagesTotal <= 0) {
+            book.current = book.chaptersRead;
+            book.total = book.chaptersTotal;
+          }
+        }
       }
 
       saveLocalData();
       renderLibrary();
 
-      if (calculateBookProgress(book).isCompleted) {
+      if (!wasCompleted && calculateBookProgress(book).isCompleted) {
         showToast(`🎉 ¡Completaste "${book.title}"!`, 'success');
       }
 
@@ -1693,17 +1789,25 @@
       }
 
       const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      const { percent } = calculateBookProgress(chosen);
-      const unitPlural = getUnitLabel(chosen.type, true);
+      const { percent, pagePercent, chapterPercent } = calculateBookProgress(chosen);
+      const hasPages = chosen.pagesTotal > 0;
+      const hasChapters = chosen.chaptersTotal > 0;
 
       document.getElementById('dailyBookTitle').textContent = chosen.title;
       document.getElementById('dailyBookSubtitle').textContent = chosen.isSaga && chosen.sagaName
         ? `${chosen.sagaName} (Tomo #${chosen.sagaOrder || 1})${chosen.author ? ' • ' + chosen.author : ''}`
         : `${chosen.type}${chosen.author ? ' • ' + chosen.author : ''}`;
 
-      document.getElementById('dailyBookProgressBox').innerHTML = `
-        Progreso actual: <strong class="text-white">${chosen.current} / ${chosen.total} ${unitPlural}</strong> (${percent}%)
-      `;
+      let progressSummary = `Progreso actual: <strong class="text-white">${chosen.current} / ${chosen.total}</strong> (${percent}%)`;
+      if (hasPages && hasChapters) {
+        progressSummary = `Páginas: <strong class="text-sky-300">${chosen.pagesRead}/${chosen.pagesTotal}</strong> (${pagePercent}%) • Capítulos: <strong class="text-emerald-300">${chosen.chaptersRead}/${chosen.chaptersTotal}</strong> (${chapterPercent}%)`;
+      } else if (hasPages) {
+        progressSummary = `Páginas: <strong class="text-sky-300">${chosen.pagesRead} / ${chosen.pagesTotal}</strong> (${pagePercent}%)`;
+      } else if (hasChapters) {
+        progressSummary = `Capítulos: <strong class="text-emerald-300">${chosen.chaptersRead} / ${chosen.chaptersTotal}</strong> (${chapterPercent}%)`;
+      }
+
+      document.getElementById('dailyBookProgressBox').innerHTML = progressSummary;
 
       const modal = document.getElementById('dailyModal');
       modal.classList.remove('hidden');
