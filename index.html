@@ -128,6 +128,13 @@
               </svg>
               <span>Conectar Google Sheets</span>
             </button>
+            <!-- Botón Descubrir Recomendaciones Web -->
+            <button onclick="openRecommendationsModal()" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 text-purple-300 text-xs font-semibold transition">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+              </svg>
+              <span>Descubrir</span>
+            </button>
           </div>
 
           <!-- Pill de usuario conectado -->
@@ -553,6 +560,43 @@
     </div>
   </div>
 
+  <!-- Modal Recomendaciones Web -->
+  <div id="recommendationsModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-purple-500/30 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden my-auto animate-pop-in">
+      <!-- Cabecera -->
+      <div class="px-5 sm:px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-950/50 via-slate-900 to-slate-900">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+            <span>🌐</span>
+            <span>Recomendaciones Basadas en tu Biblioteca</span>
+          </h2>
+          <p id="recSubtitle" class="text-xs text-slate-400 mt-0.5">Analizando tus autores y géneros favoritos...</p>
+        </div>
+        <button onclick="closeRecommendationsModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Selector de categoría a explorar -->
+      <div class="px-5 sm:px-6 pt-4 flex flex-wrap items-center justify-between gap-2">
+        <div class="inline-flex p-1 rounded-xl bg-slate-950 border border-slate-800">
+          <button onclick="fetchWebRecommendations('all')" id="recTab-all" class="rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white transition">Todo</button>
+          <button onclick="fetchWebRecommendations('Libro')" id="recTab-Libro" class="rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">📚 Libros</button>
+          <button onclick="fetchWebRecommendations('Cómic')" id="recTab-Cómic" class="rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">💥 Cómics</button>
+          <button onclick="fetchWebRecommendations('Manga')" id="recTab-Manga" class="rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">⛩️ Mangas</button>
+        </div>
+        <button onclick="fetchWebRecommendations(currentRecFilter, true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+          <span>🔄 Refrescar sugerencias</span>
+        </button>
+      </div>
+
+      <!-- Cuerpo de resultados -->
+      <div id="recommendationsBody" class="p-5 sm:p-6 max-h-[68vh] overflow-y-auto space-y-4">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </div>
+  </div>
+  
   <!-- Canvas oculto para redimensionar y comprimir miniaturas subidas -->
   <canvas id="image-resizer-canvas" class="hidden"></canvas>
 
@@ -2009,6 +2053,274 @@
       modal.classList.remove('flex');
     }
 
+    // =========================================================================
+    // MOTOR DE RECOMENDACIONES WEB (OPEN LIBRARY + JIKAN / MYANIMELIST)
+    // =========================================================================
+    let currentRecFilter = 'all';
+    let cachedRecommendations = [];
+
+    function openRecommendationsModal() {
+      if (books.length === 0) {
+        showToast('Agrega al menos un libro, cómic o manga para recibir recomendaciones.', 'info');
+        return;
+      }
+      const modal = document.getElementById('recommendationsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+      fetchWebRecommendations('all', false);
+    }
+
+    function closeRecommendationsModal() {
+      const modal = document.getElementById('recommendationsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function mapSpanishGenreToEnglish(genre) {
+      const g = (genre || '').toLowerCase();
+      if (g.includes('terror') || g.includes('horror')) return 'horror';
+      if (g.includes('ciencia') || g.includes('sci-fi') || g.includes('scifi')) return 'science_fiction';
+      if (g.includes('fantas')) return 'fantasy';
+      if (g.includes('misterio') || g.includes('thriller') || g.includes('suspenso')) return 'thriller';
+      if (g.includes('superh') || g.includes('comic') || g.includes('cómic')) return 'superheroes';
+      if (g.includes('psicol') || g.includes('drama')) return 'psychological';
+      if (g.includes('romanc')) return 'romance';
+      if (g.includes('histor')) return 'historical_fiction';
+      return g.replace(/\s+/g, '_');
+    }
+
+    async function fetchWebRecommendations(filterType = 'all', forceRefresh = false) {
+      currentRecFilter = filterType;
+      document.querySelectorAll('.rec-tab-btn').forEach(btn => {
+        const isCurrent = btn.id === `recTab-${filterType}`;
+        btn.className = isCurrent
+          ? 'rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white transition'
+          : 'rec-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+      });
+
+      const body = document.getElementById('recommendationsBody');
+      const subtitle = document.getElementById('recSubtitle');
+
+      if (!forceRefresh && cachedRecommendations.length > 0) {
+        renderRecommendationCards(cachedRecommendations, filterType);
+        return;
+      }
+
+      body.innerHTML = `
+        <div class="py-12 text-center space-y-3">
+          <div class="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-sm font-semibold text-slate-300">Consultando catálogos en la web según tus lecturas...</p>
+          <p class="text-xs text-slate-500">Buscando obras del mismo autor y géneros similares que aún no hayas leído</p>
+        </div>
+      `;
+
+      const ownedTitles = new Set(books.map(b => b.title.trim().toLowerCase()));
+      const results = [];
+
+      // Elegir semillas de libros/cómics y mangas de la biblioteca del usuario
+      const bookSeeds = books.filter(b => b.type === 'Libro' || b.type === 'Cómic');
+      const mangaSeeds = books.filter(b => b.type === 'Manga');
+
+      const pickRandom = (arr) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null;
+      const seedBook = pickRandom(bookSeeds);
+      const seedManga = pickRandom(mangaSeeds);
+
+      const usedSeedsText = [];
+
+      try {
+        // 1. Recomendaciones de Libros / Cómics por Autor y Género (Open Library API)
+        if (seedBook) {
+          usedSeedsText.push(`${seedBook.title}${seedBook.author ? ' (' + seedBook.author + ')' : ''}`);
+
+          // A) Obras del mismo autor
+          if (seedBook.author && seedBook.author.trim()) {
+            const authorUrl = `https://openlibrary.org/search.json?author=${encodeURIComponent(seedBook.author.trim())}&limit=8`;
+            const res = await fetch(authorUrl);
+            if (res.ok) {
+              const data = await res.json();
+              (data.docs || []).forEach(doc => {
+                const title = (doc.title || '').trim();
+                if (!title || ownedTitles.has(title.toLowerCase())) return;
+                if (results.some(r => r.title.toLowerCase() === title.toLowerCase())) return;
+
+                results.push({
+                  title,
+                  author: (doc.author_name && doc.author_name[0]) || seedBook.author,
+                  type: seedBook.type,
+                  genre: seedBook.genre || 'Mismo autor',
+                  pagesTotal: doc.number_of_pages_median || 0,
+                  chaptersTotal: 0,
+                  cover: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '',
+                  reason: `Porque leíste "${seedBook.title}" de ${seedBook.author}`
+                });
+              });
+            }
+          }
+
+          // B) Obras del mismo género (otros autores)
+          if (seedBook.genre && seedBook.genre.trim()) {
+            const subjectSlug = mapSpanishGenreToEnglish(seedBook.genre);
+            const subjectUrl = `https://openlibrary.org/search.json?subject=${encodeURIComponent(subjectSlug)}&limit=8`;
+            const res = await fetch(subjectUrl);
+            if (res.ok) {
+              const data = await res.json();
+              (data.docs || []).forEach(doc => {
+                const title = (doc.title || '').trim();
+                if (!title || ownedTitles.has(title.toLowerCase())) return;
+                if (results.some(r => r.title.toLowerCase() === title.toLowerCase())) return;
+
+                results.push({
+                  title,
+                  author: (doc.author_name && doc.author_name[0]) || 'Autor destacado',
+                  type: seedBook.type,
+                  genre: seedBook.genre,
+                  pagesTotal: doc.number_of_pages_median || 0,
+                  chaptersTotal: 0,
+                  cover: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '',
+                  reason: `Similar en género (${seedBook.genre}) a "${seedBook.title}"`
+                });
+              });
+            }
+          }
+        }
+
+        // 2. Recomendaciones de Mangas (Jikan / MyAnimeList API)
+        if (seedManga) {
+          usedSeedsText.push(seedManga.title);
+          const cleanMangaQuery = seedManga.sagaName || seedManga.title.replace(/vol\.?\s*\d+/i, '').trim();
+          const searchRes = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(cleanMangaQuery)}&limit=1`);
+          if (searchRes.ok) {
+            const searchJson = await searchRes.json();
+            const malManga = searchJson.data && searchJson.data[0];
+            if (malManga && malManga.mal_id) {
+              const recRes = await fetch(`https://api.jikan.moe/v4/manga/${malManga.mal_id}/recommendations`);
+              if (recRes.ok) {
+                const recJson = await recRes.json();
+                (recJson.data || []).slice(0, 6).forEach(rec => {
+                  const entry = rec.entry;
+                  if (!entry || !entry.title) return;
+                  if (ownedTitles.has(entry.title.toLowerCase())) return;
+                  if (results.some(r => r.title.toLowerCase() === entry.title.toLowerCase())) return;
+
+                  results.push({
+                    title: entry.title,
+                    author: '',
+                    type: 'Manga',
+                    genre: seedManga.genre || 'Manga recomendado',
+                    pagesTotal: 0,
+                    chaptersTotal: 0,
+                    cover: (entry.images && entry.images.jpg && entry.images.jpg.image_url) || '',
+                    reason: `Recomendado por lectores de "${seedManga.title}"`
+                  });
+                });
+              }
+            }
+          }
+        }
+
+        subtitle.textContent = usedSeedsText.length > 0
+          ? `Basado en: ${usedSeedsText.join(' • ')}`
+          : 'Sugerencias personalizadas';
+
+        cachedRecommendations = results;
+        renderRecommendationCards(results, filterType);
+      } catch (err) {
+        console.error('Error buscando recomendaciones web:', err);
+        body.innerHTML = `
+          <div class="py-10 text-center space-y-2">
+            <p class="text-sm font-bold text-rose-400">No se pudieron obtener sugerencias en este momento.</p>
+            <p class="text-xs text-slate-400">Verifica tu conexión a internet e intenta refrescar.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderRecommendationCards(allResults, filterType) {
+      const body = document.getElementById('recommendationsBody');
+      const filtered = filterType === 'all'
+        ? allResults
+        : allResults.filter(r => r.type === filterType);
+
+      if (filtered.length === 0) {
+        body.innerHTML = `
+          <div class="py-10 text-center space-y-3">
+            <p class="text-sm font-semibold text-slate-300">No encontramos sugerencias nuevas para esta categoría.</p>
+            <p class="text-xs text-slate-400">Asegúrate de incluir el <strong>Autor</strong> y el <strong>Género</strong> en tus obras y pulsa "Refrescar sugerencias".</p>
+          </div>
+        `;
+        return;
+      }
+
+      body.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          ${filtered.slice(0, 10).map((rec, idx) => {
+            const fallback = `https://placehold.co/120x180/1e293b/94a3b8?text=${encodeURIComponent(rec.type)}`;
+            const cover = rec.cover || fallback;
+            return `
+              <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 flex gap-3 justify-between">
+                <img src="${escapeHtml(cover)}" alt="${escapeHtml(rec.title)}" onerror="this.onerror=null;this.src='${fallback}';" class="w-16 h-24 rounded-xl object-cover bg-slate-800 shrink-0" />
+                <div class="min-w-0 flex-1 flex flex-col justify-between gap-2">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                      ${getTypeBadgeHtml(rec.type)}
+                      ${rec.genre ? `<span class="px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 text-[10px] font-semibold">${escapeHtml(rec.genre)}</span>` : ''}
+                    </div>
+                    <h4 class="text-sm font-bold text-white line-clamp-2 leading-snug">${escapeHtml(rec.title)}</h4>
+                    ${rec.author ? `<p class="text-xs text-slate-400 truncate">${escapeHtml(rec.author)}</p>` : ''}
+                    <p class="text-[11px] text-indigo-300 mt-1 line-clamp-2">✨ ${escapeHtml(rec.reason)}</p>
+                  </div>
+
+                  <button
+                    onclick="addRecommendedToLibrary(${idx}, '${filterType}')"
+                    class="self-start inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition"
+                  >
+                    + Agregar a mi lista
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function addRecommendedToLibrary(index, filterType) {
+      const filtered = filterType === 'all'
+        ? cachedRecommendations
+        : cachedRecommendations.filter(r => r.type === filterType);
+      const rec = filtered[index];
+      if (!rec) return;
+
+      const newBook = normalizeBookModel({
+        id: crypto.randomUUID(),
+        title: rec.title,
+        type: rec.type,
+        author: rec.author || '',
+        genre: rec.genre || '',
+        pagesRead: 0,
+        pagesTotal: rec.pagesTotal || 0,
+        chaptersRead: 0,
+        chaptersTotal: rec.chaptersTotal || 0,
+        isSaga: false,
+        sagaName: '',
+        sagaOrder: 1,
+        cover: rec.cover || ''
+      });
+
+      books.unshift(newBook);
+      saveLocalData();
+      renderLibrary();
+      showToast(`"${rec.title}" agregado a tu biblioteca`, 'success');
+
+      cachedRecommendations = cachedRecommendations.filter(r => r.title !== rec.title);
+      renderRecommendationCards(cachedRecommendations, filterType);
+
+      if (accessToken) {
+        await pushAllToSheets();
+      }
+    }
+    
     // =========================================================================
     // UTILIDADES UI
     // =========================================================================
